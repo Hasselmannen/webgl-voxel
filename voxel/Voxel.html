@@ -165,6 +165,9 @@
     var colorFramebuffer;
     var colorTexture;
     
+    var targetFPS = 60;
+    var targetDelta = 1000/targetFPS;
+    
     function initShaders() {
     
         // SETUP NORMAL-DEPTH SHADERS
@@ -318,34 +321,25 @@
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     }
     
-    function setupKeybindings() {
-        /*document.onkeydown = function(e) {
-            switch(e.keyCode) {
-                case 38: // UP
-                case 87: // W
-                    camera.move([0, 0, -0.1]);
-                    break;
-                case 37: // LEFT
-                case 65: // A
-                    camera.rotate([0, 0.1, 0]);
-                    break;
-                case 40: // DOWN
-                case 83: // S
-                    camera.move([0, 0, 0.1]);
-                    break;
-                case 39: // RIGHT
-                case 68: // D
-                    camera.rotate([0, -0.1, 0]);
-                    break;
-                case 81: // Q
-                    camera.move([-0.1, 0, 0]);
-                    break;
-                case 69: // E
-                    camera.move([0.1, 0, 0]);
-                    break;
-                default:
-            }
-        }*/
+    function handleInput(delta) {
+        if (isKeyDown(38) || isKeyDown(87)) { // UP / W
+            camera.move([0, 0, -0.1 * delta]);
+        }
+        if (isKeyDown(37) || isKeyDown(65)) { // LEFT / A
+            // ROTATE
+        }
+        if (isKeyDown(40) || isKeyDown(83)) { // DOWN / S
+            camera.move([0, 0, 0.1 * delta]);
+        }
+        if (isKeyDown(39) || isKeyDown(68)) { // RIGHT / D
+            // ROTATE
+        }
+        if (isKeyDown(81)) { // Q
+            camera.move([-0.1 * delta, 0, 0]);
+        }
+        if (isKeyDown(69)) { // E
+            camera.move([0.1 * delta, 0, 0]);
+        }
     }
 
     function setupScene() {
@@ -437,7 +431,6 @@
         initShaders();
         initFramebuffers(gl.viewportWidth, gl.viewportHeight);
         setupScene();
-        setupKeybindings();
         
         // Setup permanent stuff
         gl.clearColor(100/255, 149/255, 237/255, 1.0);
@@ -449,6 +442,7 @@
             var delta = now - last;
             var fps = 1000 / delta;
             
+            handleInput(delta/targetDelta);
             render();
             
             last = now;
