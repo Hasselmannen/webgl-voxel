@@ -168,6 +168,9 @@
     var targetFPS = 60;
     var targetDelta = 1000/targetFPS;
     
+    var moveSpeed = 0.1;
+    var rotateSpeed = 0.05;
+    
     function initShaders() {
     
         // SETUP NORMAL-DEPTH SHADERS
@@ -323,22 +326,22 @@
     
     function handleInput(delta) {
         if (isKeyDown(38) || isKeyDown(87)) { // UP / W
-            camera.move([0, 0, -0.1 * delta]);
+            camera.move([0, 0, moveSpeed * delta]);
         }
         if (isKeyDown(37) || isKeyDown(65)) { // LEFT / A
-            // ROTATE
+            camera.rotate([0, rotateSpeed * delta, 0]);
         }
         if (isKeyDown(40) || isKeyDown(83)) { // DOWN / S
-            camera.move([0, 0, 0.1 * delta]);
+            camera.move([0, 0, -moveSpeed * delta]);
         }
         if (isKeyDown(39) || isKeyDown(68)) { // RIGHT / D
-            // ROTATE
+            camera.rotate([0, -rotateSpeed * delta, 0]);
         }
         if (isKeyDown(81)) { // Q
-            camera.move([-0.1 * delta, 0, 0]);
+            camera.move([-moveSpeed * delta, 0, 0]);
         }
         if (isKeyDown(69)) { // E
-            camera.move([0.1 * delta, 0, 0]);
+            camera.move([moveSpeed * delta, 0, 0]);
         }
     }
 
