@@ -443,7 +443,9 @@
         // Setup permanent stuff
         gl.clearColor(100/255, 149/255, 237/255, 1.0);
         gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
-
+        gl.cullFace(gl.BACK);
+        gl.enable(gl.CULL_FACE);
+        
         // Start the render loop
         var last = performance.now();
         (function gameLoop(now){
