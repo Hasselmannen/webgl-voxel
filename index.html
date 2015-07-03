@@ -141,7 +141,7 @@
             specular = calculateSpecular(specularLight, fresnel, materialShininess, normal, directionToLight, directionFromEye);
         }
         //vec3 emissive = materialEmissive;
-        
+
         gl_FragColor = vec4(vec3(0)
         + ambient
         + diffuse * visibility
