@@ -173,8 +173,9 @@
     uniform sampler2D texture;
     
     void main(void) {
-        gl_FragColor = vec4(vec3(0)
-        , 1.0);
+        vec4 color = texture2D(texture, texCoord);
+    
+        gl_FragColor = color;
     }
 
 </script>
@@ -199,6 +200,8 @@
     var normalDepthTexture;
     var colorFramebuffer;
     var colorTexture;
+    var deferredFramebuffer;
+    var deferredTexture;
     
     var targetFPS = 60;
     var targetDelta = 1000/targetFPS;
@@ -284,6 +287,12 @@
         gl.uniformMatrix4fv(deferredShader.uniforms["invProjectionMatrix"], false, invProjectionMatrix);
     }
     
+    function setEdgeDetectionUniforms() {
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, deferredTexture);
+        gl.uniform1i(deferredShader.uniforms["texture"], 0);
+    }
+    
     function initFramebuffers(width, height) {
         // NORMAL-DEPTH FRAMEBUFFER
     
@@ -330,6 +339,31 @@
         gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, width, height);
         gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, colorTexture, 0);
         gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, colorRenderbuffer);
+        
+        gl.bindTexture(gl.TEXTURE_2D, null);
+        gl.bindRenderbuffer(gl.RENDERBUFFER, null);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        
+        // DEFERRED FRAMEBUFFER
+        
+        deferredFramebuffer = gl.createFramebuffer();
+        gl.bindFramebuffer(gl.FRAMEBUFFER, deferredFramebuffer);
+        deferredFramebuffer.width = width;
+        deferredFramebuffer.height = height;
+        
+        deferredTexture = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, deferredTexture);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+        
+        var deferredRenderbuffer = gl.createRenderbuffer();
+        gl.bindRenderbuffer(gl.RENDERBUFFER, deferredRenderbuffer);
+        gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, width, height);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, deferredTexture, 0);
+        gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, deferredRenderbuffer);
         
         gl.bindTexture(gl.TEXTURE_2D, null);
         gl.bindRenderbuffer(gl.RENDERBUFFER, null);
@@ -432,10 +466,16 @@
         drawScene();
         
         // Bind framebuffer
-        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, deferredFramebuffer);
         gl.useProgram(deferredShader);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
         setDeferredUniforms();
         drawFullscreenQuad(deferredShader);
+
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        gl.useProgram(edgeDetectionShader);
+        setEdgeDetectionUniforms();
+        drawFullscreenQuad(edgeDetectionShader);
     }
     
     function webGLStart() {
