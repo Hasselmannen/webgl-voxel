@@ -493,23 +493,40 @@
         gl.cullFace(gl.BACK);
         gl.enable(gl.CULL_FACE);
         
-        // Start the render loop
+        // Start the game loop
         var last = performance.now();
         (function gameLoop(now){
             var delta = now - last;
-            var fps = 1000 / delta;
+            displayFPS(delta);
             
             handleInput(delta/targetDelta);
             render();
             
             last = now;
             
+            
             requestAnimationFrame(gameLoop);
         })(performance.now());
+    }
+    
+    var fpsCounter = new Array(10);
+    var fpsIterations = 0;
+    function displayFPS(delta) {
+        var fps = 1000 / delta;
+        fpsCounter.shift();
+        fpsCounter[4] = fps;
+        fpsIterations++;
+        if (fpsIterations % fpsCounter.length === 0) {
+            fpsIterations = 0;
+            var sum = fpsCounter.reduce(function(a, b) {return a + b;});
+            var avg = sum / fpsCounter.length;
+            document.getElementById("fps-text").innerHTML = "FPS: " + avg.toFixed(1);
+        }
     }
 </script>
 </head>
 <body onload="webGLStart();">
     <canvas id="canvas" style="border: none;" width="1280" height="720"></canvas>
+    <p id="fps-text">FPS: </p>
 </body>
 </html>
