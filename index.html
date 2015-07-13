@@ -212,6 +212,10 @@
         gl.attachShader(shader, getShader(gl, fs));
         gl.linkProgram(shader);
         
+        if (!gl.getProgramParameter(shader, gl.LINK_STATUS)) {
+            alert("Could not initialise " + vs + "/" + fs + " shaders!");
+        }
+        
         gl.useProgram(shader);
         
         shader.attributes = {};
