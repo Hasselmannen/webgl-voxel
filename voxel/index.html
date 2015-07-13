@@ -150,11 +150,41 @@
     }
 </script>
 
+
+<script id ="edge-detection-vs" type="x-shader/x-vertex">
+    precision highp float;
+    
+    attribute vec2 position;
+    
+    varying vec2 texCoord;
+    
+    const vec2 scale = vec2(0.5, 0.5);
+    
+    void main(void) {
+        texCoord = position * scale + scale;
+        gl_Position = vec4(position, 0.0, 1.0);
+    }
+</script>
+<script id ="edge-detection-fs" type="x-shader/x-fragment">
+    precision highp float;
+    
+    varying vec2 texCoord;
+    
+    uniform sampler2D texture;
+    
+    void main(void) {
+        gl_FragColor = vec4(vec3(0)
+        , 1.0);
+    }
+
+</script>
+
 <script type="text/javascript">
     // Shaders
     var normalDepthShader;
     var colorShader;
     var deferredShaderProgram;
+    var edgeDetectionShader;
     
     // Render matrices
     var modelViewMatrix = mat4.create();
@@ -175,6 +205,29 @@
     
     var moveSpeed = 0.1;
     var rotateSpeed = 0.05;
+    
+    function initEdgeDetectionShaders() {
+        var vert = getShader(gl, "edge-detection-vs");
+        var frag = getShader(gl, "edge-detection-fs");
+        
+        edgeDetectionShader = gl.createProgram();
+        gl.attachShader(edgeDetectionShader, vert);
+        gl.attachShader(edgeDetectionShader, frag);
+        gl.linkProgram(edgeDetectionShader);
+        
+        if (!gl.getProgramParameter(normalDepthShader, gl.LINK_STATUS)) {
+            alert("Could not initialize edge detection shaders!");
+        }
+        
+        gl.useProgram(edgeDetectionShader);
+        
+        // Attributes
+        edgeDetectionShader.vertexPositionAttribute = gl.getAttribLocation(edgeDetectionShader, "position");
+        gl.enableVertexAttribArray(edgeDetectionShader.vertexPositionAttribute);
+        
+        // Uniforms
+        edgeDetectionShader.texture = gl.getUniformLocation(edgeDetectionShader, "texture");
+    }
     
     function initShaders() {
     
@@ -250,6 +303,8 @@
         deferredShader.colorTexture = gl.getUniformLocation(deferredShader, "colorTexture");
         deferredShader.viewSpaceLightPos = gl.getUniformLocation(deferredShader, "viewSpaceLightPos");
         deferredShader.invProjectionMatrix = gl.getUniformLocation(deferredShader, "invProjectionMatrix");
+        
+        initEdgeDetectionShaders();
     }
 
     function setNormalDepthUniforms() {
