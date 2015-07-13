@@ -147,11 +147,11 @@ Chunk.prototype.CreateCube = function(x, y, z) {
 Chunk.prototype.Update = function(delta) {};
 Chunk.prototype.SetPositions = function(shader) {
     gl.bindBuffer(gl.ARRAY_BUFFER, this._positionBuffer);
-    gl.vertexAttribPointer(shader.vertexPositionAttribute, Block.VERTEX_SIZE, gl.FLOAT, false, 0, 0);
+    gl.vertexAttribPointer(shader.attributes["position"], Block.VERTEX_SIZE, gl.FLOAT, false, 0, 0);
 };
 Chunk.prototype.SetNormals = function(shader) {
     gl.bindBuffer(gl.ARRAY_BUFFER, this._normalBuffer);
-    gl.vertexAttribPointer(shader.vertexNormalAttribute, Block.NORMAL_SIZE, gl.FLOAT, false, 0, 0);
+    gl.vertexAttribPointer(shader.attributes["normal"], Block.NORMAL_SIZE, gl.FLOAT, false, 0, 0);
 };
 Chunk.prototype.Render = function(shader) {
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._indexBuffer);

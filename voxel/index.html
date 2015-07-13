@@ -206,130 +206,78 @@
     var moveSpeed = 0.1;
     var rotateSpeed = 0.05;
     
-    function initEdgeDetectionShaders() {
-        var vert = getShader(gl, "edge-detection-vs");
-        var frag = getShader(gl, "edge-detection-fs");
+    function initShader(vs, fs, attributes, uniforms) {
+        var shader = gl.createProgram();
+        gl.attachShader(shader, getShader(gl, vs));
+        gl.attachShader(shader, getShader(gl, fs));
+        gl.linkProgram(shader);
         
-        edgeDetectionShader = gl.createProgram();
-        gl.attachShader(edgeDetectionShader, vert);
-        gl.attachShader(edgeDetectionShader, frag);
-        gl.linkProgram(edgeDetectionShader);
+        gl.useProgram(shader);
         
-        if (!gl.getProgramParameter(normalDepthShader, gl.LINK_STATUS)) {
-            alert("Could not initialize edge detection shaders!");
+        shader.attributes = {};
+        shader.uniforms = {};
+        
+        for (val of attributes) {
+            shader.attributes[val] = gl.getAttribLocation(shader, val);
+            gl.enableVertexAttribArray(shader.attributes[val]);
         }
         
-        gl.useProgram(edgeDetectionShader);
+        for (val of uniforms) {
+            shader.uniforms[val] = gl.getUniformLocation(shader, val);
+        }
         
-        // Attributes
-        edgeDetectionShader.vertexPositionAttribute = gl.getAttribLocation(edgeDetectionShader, "position");
-        gl.enableVertexAttribArray(edgeDetectionShader.vertexPositionAttribute);
-        
-        // Uniforms
-        edgeDetectionShader.texture = gl.getUniformLocation(edgeDetectionShader, "texture");
+        return shader;
     }
-    
+
     function initShaders() {
-    
-        // SETUP NORMAL-DEPTH SHADERS
-        var normalDepthVert = getShader(gl, "normal-depth-vs");
-        var normalDepthFrag = getShader(gl, "normal-depth-fs");
-
-        normalDepthShader = gl.createProgram();
-        gl.attachShader(normalDepthShader, normalDepthVert);
-        gl.attachShader(normalDepthShader, normalDepthFrag);
-        gl.linkProgram(normalDepthShader);
-
-        if (!gl.getProgramParameter(normalDepthShader, gl.LINK_STATUS)) {
-            alert("Could not initialise normal-depth shaders");
-        }
-
-        gl.useProgram(normalDepthShader);
-
-        // Attributes
-        normalDepthShader.vertexPositionAttribute = gl.getAttribLocation(normalDepthShader, "position");
-        gl.enableVertexAttribArray(normalDepthShader.vertexPositionAttribute);
-        normalDepthShader.vertexNormalAttribute = gl.getAttribLocation(normalDepthShader, "normal");
-        gl.enableVertexAttribArray(normalDepthShader.vertexNormalAttribute);
-        
-        // Uniforms
-        normalDepthShader.projectionMatrix = gl.getUniformLocation(normalDepthShader, "projectionMatrix");
-        normalDepthShader.modelViewMatrix = gl.getUniformLocation(normalDepthShader, "modelViewMatrix");
-        
-        // SETUP COLOR SHADERS
-        var colorVert = getShader(gl, "color-vs");
-        var colorFrag = getShader(gl, "color-fs");
-        
-        colorShader = gl.createProgram();
-        gl.attachShader(colorShader, colorVert);
-        gl.attachShader(colorShader, colorFrag);
-        gl.linkProgram(colorShader);
-        
-        if (!gl.getProgramParameter(colorShader, gl.LINK_STATUS)) {
-            alert("Could not initialise color shaders");
-        }
-
-        gl.useProgram(colorShader);
-        
-        // Attributes
-        colorShader.vertexPositionAttribute = gl.getAttribLocation(colorShader, "position");
-        gl.enableVertexAttribArray(colorShader.vertexPositionAttribute);
-        
-        // Uniforms
-        colorShader.projectionMatrix = gl.getUniformLocation(colorShader, "projectionMatrix");
-        colorShader.modelViewMatrix = gl.getUniformLocation(colorShader, "modelViewMatrix");
-        
-        // SETUP DEFERRED SHADERS
-        var deferredFrag = getShader(gl, "deferred-shader-fs");
-        var deferredVert = getShader(gl, "deferred-shader-vs");
-        
-        deferredShader = gl.createProgram();
-        gl.attachShader(deferredShader, deferredVert);
-        gl.attachShader(deferredShader, deferredFrag);
-        gl.linkProgram(deferredShader);
-        
-        if (!gl.getProgramParameter(deferredShader, gl.LINK_STATUS)) {
-            alert("Could not initialise deferred shaders");
-        }
-        
-        gl.useProgram(deferredShader);
-        
-        // Attributes
-        deferredShader.vertexPositionAttribute = gl.getAttribLocation(deferredShader, "position");
-        gl.enableVertexAttribArray(deferredShader.vertexPositionAttribute);
-        
-        // Uniforms
-        deferredShader.normalDepthTexture = gl.getUniformLocation(deferredShader, "normalDepthTexture");
-        deferredShader.colorTexture = gl.getUniformLocation(deferredShader, "colorTexture");
-        deferredShader.viewSpaceLightPos = gl.getUniformLocation(deferredShader, "viewSpaceLightPos");
-        deferredShader.invProjectionMatrix = gl.getUniformLocation(deferredShader, "invProjectionMatrix");
-        
-        initEdgeDetectionShaders();
+        normalDepthShader = initShader(
+            "normal-depth-vs",
+            "normal-depth-fs",
+            ["position", "normal"],
+            ["projectionMatrix", "modelViewMatrix"]
+        );
+        colorShader = initShader(
+            "color-vs", "color-fs",
+            ["position"],
+            ["projectionMatrix", "modelViewMatrix"]
+        );
+        deferredShader = initShader(
+            "deferred-shader-vs",
+            "deferred-shader-fs",
+            ["position"],
+            ["normalDepthTexture", "colorTexture", "viewSpaceLightPos", "invProjectionMatrix"]
+        );
+        edgeDetectionShader = initShader(
+            "edge-detection-vs",
+            "edge-detection-fs",
+            ["position"],
+            ["texture"]
+        );
     }
-
+    
     function setNormalDepthUniforms() {
-        gl.uniformMatrix4fv(normalDepthShader.projectionMatrix, false, projectionMatrix);
-        gl.uniformMatrix4fv(normalDepthShader.modelViewMatrix, false, modelViewMatrix);
+        gl.uniformMatrix4fv(normalDepthShader.uniforms["projectionMatrix"], false, projectionMatrix);
+        gl.uniformMatrix4fv(normalDepthShader.uniforms["modelViewMatrix"], false, modelViewMatrix);
     }
     
     function setColorUniforms() {
-        gl.uniformMatrix4fv(colorShader.projectionMatrix, false, projectionMatrix);
-        gl.uniformMatrix4fv(colorShader.modelViewMatrix, false, modelViewMatrix);
+        gl.uniformMatrix4fv(colorShader.uniforms["projectionMatrix"], false, projectionMatrix);
+        gl.uniformMatrix4fv(colorShader.uniforms["modelViewMatrix"], false, modelViewMatrix);
     }
     
     function setDeferredUniforms() {
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, normalDepthTexture);
-        gl.uniform1i(deferredShader.normalDepthTexture, 0);
+        gl.uniform1i(deferredShader.uniforms["normalDepthTexture"], 0);
         gl.activeTexture(gl.TEXTURE1);
         gl.bindTexture(gl.TEXTURE_2D, colorTexture);
-        gl.uniform1i(deferredShader.colorTexture, 1);
+        gl.uniform1i(deferredShader.uniforms["colorTexture"], 1);
         
-        gl.uniform3fv(deferredShader.viewSpaceLightPos, viewSpaceLightPos);
+        gl.uniform3fv(deferredShader.uniforms["viewSpaceLightPos"], viewSpaceLightPos);
         
         var invProjectionMatrix = mat4.create();
         mat4.inverse(projectionMatrix, invProjectionMatrix);
-        gl.uniformMatrix4fv(deferredShader.invProjectionMatrix, false, invProjectionMatrix);
+        gl.uniformMatrix4fv(deferredShader.uniforms["invProjectionMatrix"], false, invProjectionMatrix);
     }
     
     function initFramebuffers(width, height) {
