@@ -93,6 +93,34 @@ Block.NORMALS = [
 ];
 Block.NORMAL_COUNT = 24;
 Block.NORMAL_SIZE = 3;
+Block.TEX_COORDS = [
+    0, 0,
+    1, 0,
+    1, 1,
+    0, 1,
+    0, 0,
+    1, 0,
+    1, 1,
+    0, 1,
+    0, 0,
+    1, 0,
+    1, 1,
+    0, 1,
+    0, 0,
+    1, 0,
+    1, 1,
+    0, 1,
+    0, 0,
+    1, 0,
+    1, 1,
+    0, 1,
+    0, 0,
+    1, 0,
+    1, 1,
+    0, 1
+];
+Block.TEX_COORD_COUNT = 24;
+Block.TEX_COORD_SIZE = 2;
 
 function Chunk() {
     this._blocks = new Array(Chunk.SIZE);
@@ -100,11 +128,11 @@ function Chunk() {
     this._mesh.vertices = new Array();
     this._mesh.indices = new Array();
     this._mesh.normals = new Array();
-    this._mesh.textureCoords = new Array();
+    this._mesh.texCoords = new Array();
     this._positionBuffer = gl.createBuffer();
     this._indexBuffer = gl.createBuffer();
     this._normalBuffer = gl.createBuffer();
-    this._textureCoordBuffer = gl.createBuffer();
+    this._texCoordBuffer = gl.createBuffer();
     
     for (var x = 0; x < Chunk.SIZE; x++) {
         this._blocks[x] = new Array(Chunk.SIZE);
@@ -129,6 +157,7 @@ Chunk.prototype.CreateMesh = function() {
                     }
                     this._mesh.indices = this._mesh.indices.concat(Block.INDICES.map(function(n) { return n + createdVoxels * Block.VERTEX_COUNT; }));
                     this._mesh.normals = this._mesh.normals.concat(Block.NORMALS);
+                    this._mesh.texCoords = this._mesh.texCoords.concat(Block.TEX_COORDS);
                     createdVoxels++;
                 }
             }
@@ -138,6 +167,8 @@ Chunk.prototype.CreateMesh = function() {
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this._mesh.vertices), gl.STATIC_DRAW);
     gl.bindBuffer(gl.ARRAY_BUFFER, this._normalBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this._mesh.normals), gl.STATIC_DRAW);
+    gl.bindBuffer(gl.ARRAY_BUFFER, this._texCoordBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this._mesh.texCoords), gl.STATIC_DRAW);
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._indexBuffer);
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(this._mesh.indices), gl.STATIC_DRAW);
 };
@@ -153,6 +184,10 @@ Chunk.prototype.SetNormals = function(shader) {
     gl.bindBuffer(gl.ARRAY_BUFFER, this._normalBuffer);
     gl.vertexAttribPointer(shader.attributes["normal"], Block.NORMAL_SIZE, gl.FLOAT, false, 0, 0);
 };
+Chunk.prototype.SetTexCoords = function(shader) {
+    gl.bindBuffer(gl.ARRAY_BUFFER, this._texCoordBuffer);
+    gl.vertexAttribPointer(shader.attributes["texCoordIn"], Block.TEX_COORD_SIZE, gl.FLOAT, false, 0, 0);
+}
 Chunk.prototype.Render = function(shader) {
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._indexBuffer);
     gl.drawElements(gl.TRIANGLES, this._mesh.indices.length/Block.INDEX_SIZE, gl.UNSIGNED_SHORT, 0);
