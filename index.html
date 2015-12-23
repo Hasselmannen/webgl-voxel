@@ -9,6 +9,7 @@
 <script type="text/javascript" src="gl-stuff.js"></script>
 <script type="text/javascript" src="voxel-stuff.js"></script>
 <script type="text/javascript" src="util.js"></script>
+<script type="text/javascript" src="texture.js"></script>
 
 <script id="normal-depth-vs" type="x-shader/x-vertex">
     attribute vec3 position;
@@ -42,19 +43,27 @@
 <script id="color-vs" type="x-shader/x-vertex">
     attribute vec3 position;
     attribute vec3 normal;
-    
+    attribute vec2 texCoordIn;
+
     uniform mat4 modelViewMatrix;
     uniform mat4 projectionMatrix;
-    
+
+    varying vec2 texCoordOut;
+
     void main(void) {
         gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        texCoordOut = texCoordIn;
     }
 </script>
 <script id="color-fs" type="x-shader/x-fragment">
     precision highp float;
     
-    void main(void) {    
-        gl_FragColor = vec4(0.8, 0.8, 0.8, 1.0);
+    uniform sampler2D texture;
+    
+    varying vec2 texCoordOut;
+    
+    void main(void) {
+        gl_FragColor = texture2D(texture, texCoordOut);
     }
 </script>
 
@@ -173,7 +182,6 @@
     
     void main(void) {
         vec4 color = texture2D(texture, texCoord);
-    
         gl_FragColor = color;
     }
 
@@ -199,6 +207,7 @@
     var normalDepthTexture;
     var colorFramebuffer;
     var colorTexture;
+    var cubeTexture;
     var deferredFramebuffer;
     var deferredTexture;
     
@@ -243,8 +252,9 @@
             ["projectionMatrix", "modelViewMatrix"]
         );
         colorShader = initShader(
-            "color-vs", "color-fs",
-            ["position"],
+            "color-vs",
+            "color-fs",
+            ["position", "texCoordIn"],
             ["projectionMatrix", "modelViewMatrix"]
         );
         deferredShader = initShader(
@@ -269,6 +279,8 @@
     function setColorUniforms() {
         gl.uniformMatrix4fv(colorShader.uniforms["projectionMatrix"], false, projectionMatrix);
         gl.uniformMatrix4fv(colorShader.uniforms["modelViewMatrix"], false, modelViewMatrix);
+        gl.bindTexture(gl.TEXTURE_2D, cubeTexture);
+        gl.uniform1i(colorShader.uniforms["texture"], 0);
     }
     
     function setDeferredUniforms() {
@@ -324,6 +336,17 @@
         gl.bindFramebuffer(gl.FRAMEBUFFER, colorFramebuffer);
         colorFramebuffer.width = width;
         colorFramebuffer.height = height;
+        
+        cubeTexture = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, cubeTexture);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 255, 255]));
+        var image = new Image();
+        image.addEventListener('load', function() {
+            gl.bindTexture(gl.TEXTURE_2D, cubeTexture);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+            gl.generateMipmap(gl.TEXTURE_2D);
+        });
+        image.src = cubeTextureData.data;
         
         colorTexture = gl.createTexture();
         gl.bindTexture(gl.TEXTURE_2D, colorTexture);
@@ -456,6 +479,7 @@
         
         for (var i = 0; i < chunks.length; i++) {
             chunks[i].SetPositions(colorShader);
+            chunks[i].SetTexCoords(colorShader);
             chunks[i].Render(colorShader);
         }
     }
