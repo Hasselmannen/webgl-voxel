@@ -1,5 +1,6 @@
 var gl;
 var ext;
+var mrtExt;
 function initGL(canvas) {
     try {
         gl = canvas.getContext("experimental-webgl");
@@ -10,15 +11,17 @@ function initGL(canvas) {
     if (!gl) {
         alert("Could not initialize WebGL!");
     }
-    /* // MRT stuff
-    ext = gl.getExtension('WEBGL_draw_buffers');
-    if (!ext) {
+    mrtExt = gl.getExtension('WEBGL_draw_buffers');
+    if (!mrtExt) {
         alert("Could not initialize WEBGL_draw_buffers!");
     }
-    */
     ext = gl.getExtension("OES_texture_float");
     if (!ext) {
         alert("no OES_texture_float");
+    }
+    ext = gl.getExtension("OES_texture_float_linear");
+    if (!ext) {
+        alert("no OES_texture_float_linear");
     }
 }
 
