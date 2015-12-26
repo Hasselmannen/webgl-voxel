@@ -10,7 +10,7 @@
 <script type="text/javascript" src="util.js"></script>
 <script type="text/javascript" src="texture.js"></script>
 
-<script id="normal-depth-vs" type="x-shader/x-vertex">
+<script id="pre-vs" type="x-shader/x-vertex">
     attribute vec3 position;
     attribute vec3 normal;
     attribute vec3 tangent;
@@ -20,15 +20,15 @@
     uniform mat4 modelViewMatrix;
     uniform mat4 projectionMatrix;
     
+    varying vec2 texCoordOut;
     varying vec3 viewSpacePosition;
     varying vec3 viewSpaceNormal;
     varying mat3 TBN;
-    varying vec2 texCoordOut;
-    
     void main(void) {
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        
         viewSpacePosition = vec3(modelViewMatrix * vec4(position, 1));
         viewSpaceNormal = vec3(modelViewMatrix * vec4(normal, 0));
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
         vec3 viewSpaceTangent = vec3(modelViewMatrix * vec4(normalize(tangent), 0));
         vec3 viewSpaceBitangent = vec3(modelViewMatrix * vec4(normalize(bitangent), 0));
         
@@ -37,46 +37,25 @@
         texCoordOut = texCoordIn;
     }
 </script>
-<script id="normal-depth-fs" type="x-shader/x-fragment">
-    precision highp float;
+<script id="pre-fs" type="x-shader/x-fragment">
+    #extension GL_EXT_draw_buffers : require
 
+    precision highp float;
+    
+    uniform sampler2D diffuseTexture;
     uniform sampler2D normalTexture;
     
+    varying vec2 texCoordOut;
     varying vec3 viewSpacePosition;
     varying vec3 viewSpaceNormal;
     varying mat3 TBN;
-    varying vec2 texCoordOut;
+    
+    precision highp float;
     
     void main(void) {
         vec3 normal = normalize(TBN * (texture2D(normalTexture, texCoordOut).rgb * 2.0 - 1.0));
-        gl_FragColor = vec4(normal, -viewSpacePosition.z);
-    }
-</script>
-
-<script id="color-vs" type="x-shader/x-vertex">
-    attribute vec3 position;
-    attribute vec3 normal;
-    attribute vec2 texCoordIn;
-
-    uniform mat4 modelViewMatrix;
-    uniform mat4 projectionMatrix;
-
-    varying vec2 texCoordOut;
-
-    void main(void) {
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        texCoordOut = texCoordIn;
-    }
-</script>
-<script id="color-fs" type="x-shader/x-fragment">
-    precision highp float;
-    
-    uniform sampler2D texture;
-    
-    varying vec2 texCoordOut;
-    
-    void main(void) {
-        gl_FragColor = texture2D(texture, texCoordOut);
+        gl_FragData[0] = texture2D(diffuseTexture, texCoordOut);
+        gl_FragData[1] = vec4(normal, -viewSpacePosition.z);
     }
 </script>
 
@@ -107,7 +86,7 @@
     uniform vec3 viewSpaceLightPos;
     
     uniform sampler2D normalDepthTexture;
-    uniform sampler2D colorTexture;
+    uniform sampler2D diffuseTexture;
     
     vec3 ambientLight = vec3(0.2, 0.2, 0.2);
     vec3 diffuseLight = vec3(0.9, 0.9, 0.5);
@@ -135,7 +114,7 @@
     
     void main(void) {
         vec4 normalDepth = texture2D(normalDepthTexture, texCoord);
-        vec4 colorRGBA = texture2D(colorTexture, texCoord);
+        vec4 colorRGBA = texture2D(diffuseTexture, texCoord);
         
         float depth = normalDepth.a;
         float alpha = colorRGBA.a;
@@ -175,6 +154,7 @@
     // Shaders
     var normalDepthShader;
     var colorShader;
+    var preShader;
     var deferredShaderProgram;
     
     // Render matrices
@@ -186,12 +166,12 @@
     
     var chunks = new Array();
     
-    var normalDepthFramebuffer;
     var normalDepthTexture;
     var normalTexture;
-    var colorFramebuffer;
-    var colorTexture;
+    var diffuseTexture;
     var cubeTexture;
+    var depthTexture;
+    var preFramebuffer;
     
     var targetFPS = 60;
     var targetDelta = 1000/targetFPS;
@@ -227,47 +207,37 @@
     }
 
     function initShaders() {
-        normalDepthShader = initShader(
-            "normal-depth-vs",
-            "normal-depth-fs",
+        preShader = initShader(
+            "pre-vs",
+            "pre-fs",
             ["position", "normal", "tangent", "bitangent", "texCoordIn"],
-            ["projectionMatrix", "modelViewMatrix", "normalTexture"]
-        );
-        colorShader = initShader(
-            "color-vs",
-            "color-fs",
-            ["position", "texCoordIn"],
-            ["projectionMatrix", "modelViewMatrix"]
+            ["projectionMatrix", "modelViewMatrix", "normalTexture", "diffuseTexture"]
         );
         deferredShader = initShader(
             "deferred-shader-vs",
             "deferred-shader-fs",
             ["position"],
-            ["normalDepthTexture", "colorTexture", "viewSpaceLightPos", "invProjectionMatrix"]
+            ["normalDepthTexture", "diffuseTexture", "viewSpaceLightPos", "invProjectionMatrix"]
         );
     }
     
-    function setNormalDepthUniforms() {
-        gl.uniformMatrix4fv(normalDepthShader.uniforms["projectionMatrix"], false, projectionMatrix);
-        gl.uniformMatrix4fv(normalDepthShader.uniforms["modelViewMatrix"], false, modelViewMatrix);
-        gl.bindTexture(gl.TEXTURE_2D, normalTexture);
-        gl.uniform1i(normalDepthShader.uniforms["normalTexture"], 0);
-    }
-    
-    function setColorUniforms() {
-        gl.uniformMatrix4fv(colorShader.uniforms["projectionMatrix"], false, projectionMatrix);
-        gl.uniformMatrix4fv(colorShader.uniforms["modelViewMatrix"], false, modelViewMatrix);
+    function setPreUniforms() {
+        gl.uniformMatrix4fv(preShader.uniforms["projectionMatrix"], false, projectionMatrix);
+        gl.uniformMatrix4fv(preShader.uniforms["modelViewMatrix"], false, modelViewMatrix);
+        gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, cubeTexture);
-        gl.uniform1i(colorShader.uniforms["texture"], 0);
+        gl.uniform1i(preShader.uniforms["diffuseTexture"], 0);
+        gl.activeTexture(gl.TEXTURE1);
+        gl.bindTexture(gl.TEXTURE_2D, normalTexture);
+        gl.uniform1i(preShader.uniforms["normalTexture"], 1);
     }
-    
     function setDeferredUniforms() {
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, normalDepthTexture);
         gl.uniform1i(deferredShader.uniforms["normalDepthTexture"], 0);
         gl.activeTexture(gl.TEXTURE1);
-        gl.bindTexture(gl.TEXTURE_2D, colorTexture);
-        gl.uniform1i(deferredShader.uniforms["colorTexture"], 1);
+        gl.bindTexture(gl.TEXTURE_2D, diffuseTexture);
+        gl.uniform1i(deferredShader.uniforms["diffuseTexture"], 1);
         gl.uniform3fv(deferredShader.uniforms["viewSpaceLightPos"], viewSpaceLightPos);
         
         var invProjectionMatrix = mat4.create();
@@ -277,20 +247,6 @@
     }
     
     function initFramebuffers(width, height) {
-        // NORMAL-DEPTH FRAMEBUFFER
-    
-        normalDepthFramebuffer = gl.createFramebuffer();
-        gl.bindFramebuffer(gl.FRAMEBUFFER, normalDepthFramebuffer);
-        normalDepthFramebuffer.width = width;
-        normalDepthFramebuffer.height = height;
-        
-        normalDepthTexture = gl.createTexture();
-        gl.bindTexture(gl.TEXTURE_2D, normalDepthTexture);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.FLOAT, null);
 
         normalTexture = gl.createTexture();
         gl.bindTexture(gl.TEXTURE_2D, normalTexture);
@@ -303,23 +259,6 @@
         });
         image2.src = cubeTextureData.normalMap;
         
-        var normalDepthRenderbuffer = gl.createRenderbuffer();
-        gl.bindRenderbuffer(gl.RENDERBUFFER, normalDepthRenderbuffer);
-        gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, width, height);
-        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, normalDepthTexture, 0);
-        gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, normalDepthRenderbuffer);
-        
-        gl.bindTexture(gl.TEXTURE_2D, null);
-        gl.bindRenderbuffer(gl.RENDERBUFFER, null);
-        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-        
-        // COLOR FRAMEBUFFER
-        
-        colorFramebuffer = gl.createFramebuffer();
-        gl.bindFramebuffer(gl.FRAMEBUFFER, colorFramebuffer);
-        colorFramebuffer.width = width;
-        colorFramebuffer.height = height;
-        
         cubeTexture = gl.createTexture();
         gl.bindTexture(gl.TEXTURE_2D, cubeTexture);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 255, 255]));
@@ -331,19 +270,51 @@
         });
         image.src = cubeTextureData.data;
         
-        colorTexture = gl.createTexture();
-        gl.bindTexture(gl.TEXTURE_2D, colorTexture);
+        var depthExt = gl.getExtension("WEBGL_depth_texture");
+        if (!depthExt) {
+            console.log("no depth textures");
+        }
+        
+        
+        diffuseTexture = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, diffuseTexture);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.FLOAT, null);
 
-        var colorRenderbuffer = gl.createRenderbuffer();
-        gl.bindRenderbuffer(gl.RENDERBUFFER, colorRenderbuffer);
-        gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, width, height);
-        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, colorTexture, 0);
-        gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, colorRenderbuffer);
+        normalDepthTexture = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, normalDepthTexture);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.FLOAT, null);
+        
+        depthTexture = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, depthTexture);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT, width, height, 0, gl.DEPTH_COMPONENT, gl.UNSIGNED_SHORT, null);
+        
+        // PRE FRAMEBUFFER
+        preFramebuffer = gl.createFramebuffer();
+        gl.bindFramebuffer(gl.FRAMEBUFFER, preFramebuffer);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, depthTexture, 0);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, mrtExt.COLOR_ATTACHMENT0_WEBGL, gl.TEXTURE_2D, diffuseTexture, 0);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, mrtExt.COLOR_ATTACHMENT1_WEBGL, gl.TEXTURE_2D, normalDepthTexture, 0);
+        
+        if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) {
+            console.log("Incomplete framebuffer");
+        }
+        
+        mrtExt.drawBuffersWEBGL([
+            mrtExt.COLOR_ATTACHMENT0_WEBGL,
+            mrtExt.COLOR_ATTACHMENT1_WEBGL
+        ]);
         
         gl.bindTexture(gl.TEXTURE_2D, null);
         gl.bindRenderbuffer(gl.RENDERBUFFER, null);
@@ -414,41 +385,29 @@
         
         var lightPos = [8, 8, 8];
         mat4.multiplyVec3(modelViewMatrix, lightPos, viewSpaceLightPos);
-        
-        gl.bindFramebuffer(gl.FRAMEBUFFER, normalDepthFramebuffer);
-        gl.enable(gl.DEPTH_TEST);
-        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-        gl.useProgram(normalDepthShader);
-        setNormalDepthUniforms();
-        
-        for (var i = 0; i < chunks.length; i++) {
-            chunks[i].SetPositions(normalDepthShader);
-            chunks[i].SetNormals(normalDepthShader);
-            chunks[i].SetTangents(normalDepthShader);
-            chunks[i].SetBitangents(normalDepthShader);
-            chunks[i].SetTexCoords(normalDepthShader);
-            chunks[i].Render(normalDepthShader);
-        }
 
-        gl.bindFramebuffer(gl.FRAMEBUFFER, colorFramebuffer);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, preFramebuffer);
         gl.enable(gl.DEPTH_TEST);
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-        gl.useProgram(colorShader);
-        setColorUniforms();
-        
+
+        gl.useProgram(preShader);
+        setPreUniforms();
+
         for (var i = 0; i < chunks.length; i++) {
-            chunks[i].SetPositions(colorShader);
-            chunks[i].SetTexCoords(colorShader);
-            chunks[i].Render(colorShader);
+            chunks[i].SetPositions(preShader);
+            chunks[i].SetNormals(preShader);
+            chunks[i].SetTangents(preShader);
+            chunks[i].SetBitangents(preShader);
+            chunks[i].SetTexCoords(preShader);
+            chunks[i].Render(preShader);
         }
     }
     
     function render() {
-        
         drawScene();
         
-        // Bind framebuffer
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        // Bind framebuffer
         gl.useProgram(deferredShader);
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
         setDeferredUniforms();
