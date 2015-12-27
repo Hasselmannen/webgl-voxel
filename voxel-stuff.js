@@ -232,7 +232,7 @@ Chunk.prototype.CreateMesh = function() {
         this._mesh.bitangents[i2*3+1] = bitangent[1];
         this._mesh.bitangents[i2*3+2] = bitangent[2];
     }
-    
+
     gl.bindBuffer(gl.ARRAY_BUFFER, this._positionBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this._mesh.vertices), gl.STATIC_DRAW);
     gl.bindBuffer(gl.ARRAY_BUFFER, this._normalBuffer);
