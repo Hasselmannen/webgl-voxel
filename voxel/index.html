@@ -23,20 +23,20 @@
     uniform mat4 projectionMatrix;
     
     varying vec3 viewSpacePosition;
-    varying mat3 TBN;
-    varying vec2 texCoordOut;
+    varying mat3 invTBN;
+    varying vec2 texCoord;
     
     void main(void) {
         viewSpacePosition = vec3(modelViewMatrix * vec4(position, 1));
         gl_Position = projectionMatrix * vec4(viewSpacePosition, 1);
         
-        vec3 viewSpaceNormal = vec3(modelViewMatrix * vec4(normal, 0));
-        vec3 viewSpaceTangent = vec3(modelViewMatrix * vec4(normalize(tangent), 0));
-        vec3 viewSpaceBitangent = vec3(modelViewMatrix * vec4(normalize(bitangent), 0));
+        vec3 viewSpaceNormal = normalize(modelViewMatrix * vec4(normal, 0.0)).xyz;
+        vec3 viewSpaceTangent = normalize(modelViewMatrix * vec4(tangent, 0.0)).xyz;
+        vec3 viewSpaceBitangent = normalize(modelViewMatrix * vec4(bitangent, 0.0)).xyz;
         
-        TBN = mat3(viewSpaceTangent, viewSpaceBitangent, viewSpaceNormal);
-
-        texCoordOut = texCoordIn;
+        invTBN = mat3(viewSpaceTangent, viewSpaceBitangent, viewSpaceNormal);
+        
+        texCoord = texCoordIn;
     }
 </script>
 <script id="pre-fs" type="x-shader/x-fragment">
@@ -48,14 +48,12 @@
     uniform sampler2D normalTexture;
     
     varying vec3 viewSpacePosition;
-    varying mat3 TBN;
-    varying vec2 texCoordOut;
-    
-    precision highp float;
+    varying mat3 invTBN;
+    varying vec2 texCoord;
     
     void main(void) {
-        vec3 normal = normalize(TBN * (texture2D(normalTexture, texCoordOut).rgb * 2.0 - 1.0));
-        gl_FragData[0] = texture2D(diffuseTexture, texCoordOut);
+        vec3 normal = normalize(invTBN * (texture2D(normalTexture, texCoord).rgb * 2.0 - 1.0));
+        gl_FragData[0] = texture2D(diffuseTexture, texCoord);
         gl_FragData[1] = vec4(normal, -viewSpacePosition.z);
     }
 </script>
@@ -274,6 +272,7 @@
         gl.activeTexture(gl.TEXTURE1);
         gl.bindTexture(gl.TEXTURE_2D, normalTexture);
         gl.uniform1i(preShader.uniforms["normalTexture"], 1);
+        gl.activeTexture(gl.TEXTURE0);
     }
     function setDeferredUniforms() {
         gl.activeTexture(gl.TEXTURE0);
@@ -300,7 +299,6 @@
         gl.uniformMatrix4fv(shadowMapShader.uniforms["projectionMatrix"], false, shadowMapProjectionMatrix);
         gl.uniformMatrix4fv(shadowMapShader.uniforms["modelViewMatrix"], false, shadowMapModelViewMatrix[face]);
     }
-    
 var shadowMapSize = 512;
 var shadowMapTexture;
 var shadowMapFramebuffer;
@@ -328,7 +326,7 @@ var shadowMapFramebuffers;
             gl.generateMipmap(gl.TEXTURE_2D);
         });
         image.src = cubeTextureData.data;
-        
+
         var depthExt = gl.getExtension("WEBGL_depth_texture");
         if (!depthExt) {
             console.log("no depth textures");
@@ -540,6 +538,8 @@ var shadowMapFramebuffers;
         gl.cullFace(gl.BACK);
         gl.enable(gl.CULL_FACE);
         
+        var time = 0;
+        
         // Start the game loop
         var last = performance.now();
         (function gameLoop(now){
@@ -548,6 +548,10 @@ var shadowMapFramebuffers;
             
             handleInput(delta/targetDelta);
             render();
+            
+            time += delta;
+            lightPos[0] = 8 + Math.sin(time / 1000.0);
+            
             
             last = now;
 
