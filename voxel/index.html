@@ -18,24 +18,24 @@
     attribute vec3 tangent;
     attribute vec3 bitangent;
     attribute vec2 texCoordIn;
-    
+
     uniform mat4 modelViewMatrix;
     uniform mat4 projectionMatrix;
-    
+
     varying vec3 viewSpacePosition;
     varying mat3 invTBN;
     varying vec2 texCoord;
-    
+
     void main(void) {
         viewSpacePosition = vec3(modelViewMatrix * vec4(position, 1));
         gl_Position = projectionMatrix * vec4(viewSpacePosition, 1);
-        
+
         vec3 viewSpaceNormal = normalize(modelViewMatrix * vec4(normal, 0.0)).xyz;
         vec3 viewSpaceTangent = normalize(modelViewMatrix * vec4(tangent, 0.0)).xyz;
         vec3 viewSpaceBitangent = normalize(modelViewMatrix * vec4(bitangent, 0.0)).xyz;
-        
+
         invTBN = mat3(viewSpaceTangent, viewSpaceBitangent, viewSpaceNormal);
-        
+
         texCoord = texCoordIn;
     }
 </script>
@@ -43,14 +43,14 @@
     #extension GL_EXT_draw_buffers : require
 
     precision highp float;
-    
+
     uniform sampler2D diffuseTexture;
     uniform sampler2D normalTexture;
-    
+
     varying vec3 viewSpacePosition;
     varying mat3 invTBN;
     varying vec2 texCoord;
-    
+
     void main(void) {
         vec3 normal = normalize(invTBN * (texture2D(normalTexture, texCoord).rgb * 2.0 - 1.0));
         gl_FragData[0] = texture2D(diffuseTexture, texCoord);
@@ -60,14 +60,14 @@
 
 <script id="shadow-map-vs" type="x-shader/x-vertex">
     precision highp float;
-    
+
     attribute vec3 position;
-    
+
     uniform mat4 projectionMatrix;
     uniform mat4 modelViewMatrix;
-    
+
     varying float distance;
-    
+
     void main(void) {
         gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
         vec3 position = vec3(modelViewMatrix * vec4(position, 1));
@@ -76,9 +76,9 @@
 </script>
 <script id="shadow-map-fs" type="x-shader/x-fragment">
     precision highp float;
-    
+
     varying float distance;
-    
+
     void main(void) {
         gl_FragColor = vec4(vec3(distance), 1);
     }
@@ -104,32 +104,35 @@
 </script>
 <script id="deferred-fs" type="x-shader/x-fragment">
     precision highp float;
-    
+
     varying vec2 texCoord;
     varying vec3 farPlaneRay;
-    
+
     uniform vec3 viewSpaceLightPos;
     uniform mat4 invModelViewMatrix;
     uniform mat4 invProjectionMatrix;
-    
+
     uniform sampler2D normalDepthTexture;
     uniform sampler2D diffuseTexture;
     uniform samplerCube shadowMap;
-    
+
     vec3 ambientLight = vec3(0.3, 0.3, 0.3);
     vec3 diffuseLight = vec3(0.9, 0.9, 0.5);
     vec3 specularLight = vec3(0.9, 0.9, 0.5);
-    
+    vec3 crepuscularLight = vec3(0.225, 0.225, 0.125);
+
     float materialShininess = 8.0;
-    
+
+    const int NUM_CREPUSCULAR_SAMPLES = 100;
+
     vec3 calculateAmbient(vec3 ambientLight, vec3 materialAmbient) {
         return ambientLight * materialAmbient;
     }
-    
+
     vec3 calculateDiffuse(vec3 diffuseLight, vec3 materialDiffuse, float diffuseReflectance) {
         return diffuseLight * materialDiffuse * diffuseReflectance;
     }
-    
+
     vec3 calculateFresnel(vec3 materialSpecular, vec3 normal, vec3 directionFromEye) {
         return materialSpecular + (vec3(1.0) - materialSpecular) * pow(clamp(1.0 + dot(directionFromEye, normal), 0.0, 1.0), 5.0);
     }
@@ -139,37 +142,37 @@
         vec3 h = normalize(directionToLight - directionFromEye);
         return specularLight * materialSpecular * pow(max(dot(h, normal), 0.0), materialShininess) * normalizationFactor;
     }
-    
+
     void main(void) {
         vec4 normalDepth = texture2D(normalDepthTexture, texCoord);
         vec4 colorRGBA = texture2D(diffuseTexture, texCoord);
-        
+
         float depth = normalDepth.a;
         float alpha = colorRGBA.a;
         vec3 normal = normalize(normalDepth.rgb);
         vec3 color = colorRGBA.rgb;
         vec3 viewSpacePosition = vec3((farPlaneRay * depth).xy, -depth);
-        
-        vec3 directionToLight = normalize(viewSpaceLightPos - viewSpacePosition);
+
+        vec3 vectorFromLight = viewSpacePosition - viewSpaceLightPos;
+        vec3 directionToLight = normalize(-vectorFromLight);
         vec3 directionFromEye = normalize(viewSpacePosition);
 
-        float nearestDepth = textureCube(shadowMap, (invModelViewMatrix * vec4(viewSpacePosition - viewSpaceLightPos, 0)).xyz).r;
+        float nearestDepth = textureCube(shadowMap, mat3(invModelViewMatrix) * vectorFromLight).r;
         float eps = 0.0;
-        
+
         float diffuseReflectance = max(0.0, dot(directionToLight, normal));
         float visibility = 0.0;
         if (diffuseReflectance > 0.0) {
             visibility = 1.0;
         }
-        vec3 vectorFromLight = viewSpacePosition - viewSpaceLightPos;
-        
+
         if (dot(vectorFromLight, vectorFromLight) > eps + nearestDepth) {
             visibility = 0.0;
         }
         vec3 fresnel = calculateFresnel(color, normal, directionFromEye);
-        
+
         vec3 ambient = calculateAmbient(ambientLight, color);
-        
+
         vec3 diffuse = vec3(0);
         vec3 specular = vec3(0);
         if (visibility > 0.01) {
@@ -178,10 +181,24 @@
         }
         //vec3 emissive = materialEmissive;
 
+        vec3 crepuscularRays = vec3(0);
+        vec3 stepSize = viewSpacePosition / float(NUM_CREPUSCULAR_SAMPLES);
+        vec3 intensity = crepuscularLight / float(NUM_CREPUSCULAR_SAMPLES);
+        for (int i = 0; i < NUM_CREPUSCULAR_SAMPLES; i++) {
+            vec3 pos = stepSize * float(i);
+            vec3 vectorFromLight = pos - viewSpaceLightPos;
+            float nearestDepth = textureCube(shadowMap, mat3(invModelViewMatrix) * vectorFromLight).x;
+            if (dot(vectorFromLight, vectorFromLight) <= eps + nearestDepth) {
+                crepuscularRays += intensity;
+            }
+        }
+        crepuscularRays * length(viewSpacePosition);
+
         gl_FragColor = vec4(vec3(0)
         + ambient
         + diffuse * visibility
         + specular * visibility
+        + crepuscularRays
         , 1.0);
     }
 </script>
@@ -193,52 +210,66 @@
     var preShader;
     var deferredShaderProgram;
     var shadowMapShader;
+
     // Render matrices
     var modelViewMatrix = mat4.create();
     var projectionMatrix = mat4.create();
-    var viewSpaceLightPos = [];
+    var shadowMapProjectionMatrix = mat4.create();
+    var shadowMapModelViewMatrices = new Array();
+
+    var lightPos = [8, 8, 8];
+    var viewSpaceLightPos = new Array();
 
     var camera = new Camera([8, 8, 19], [0, 0, -1]);
-    
+
     var chunks = new Array();
-    
+
+    var preFramebuffer;
+    var shadowMapFramebuffer;
+    var shadowMapFramebuffers;
+
     var normalDepthTexture;
     var normalTexture;
     var diffuseTexture;
     var cubeTexture;
     var depthTexture;
-    var preFramebuffer;
-    
+    var shadowMapTexture;
+
+    var sceneFarPlane = 100;
+    var shadowMapFarPlane = 100;
+    var shadowMapSize = 512;
+
     var targetFPS = 60;
     var targetDelta = 1000/targetFPS;
-    
+
     var moveSpeed = 0.1;
     var rotateSpeed = 0.05;
-    
+
+
     function initShader(vs, fs, attributes, uniforms) {
         var shader = gl.createProgram();
         gl.attachShader(shader, getShader(gl, vs));
         gl.attachShader(shader, getShader(gl, fs));
         gl.linkProgram(shader);
-        
+
         if (!gl.getProgramParameter(shader, gl.LINK_STATUS)) {
             alert("Could not initialise " + vs + "/" + fs + " shaders!");
         }
-        
+
         gl.useProgram(shader);
-        
+
         shader.attributes = {};
         shader.uniforms = {};
-        
+
         for (val of attributes) {
             shader.attributes[val] = gl.getAttribLocation(shader, val);
             gl.enableVertexAttribArray(shader.attributes[val]);
         }
-        
+
         for (val of uniforms) {
             shader.uniforms[val] = gl.getUniformLocation(shader, val);
         }
-        
+
         return shader;
     }
 
@@ -262,7 +293,7 @@
             ["normalDepthTexture", "diffuseTexture", "viewSpaceLightPos", "invProjectionMatrix", "shadowMap", "invModelViewMatrix"]
         );
     }
-    
+
     function setPreUniforms() {
         gl.uniformMatrix4fv(preShader.uniforms["projectionMatrix"], false, projectionMatrix);
         gl.uniformMatrix4fv(preShader.uniforms["modelViewMatrix"], false, modelViewMatrix);
@@ -285,24 +316,21 @@
         gl.activeTexture(gl.TEXTURE2);
         gl.bindTexture(gl.TEXTURE_CUBE_MAP, shadowMapTexture);
         gl.uniform1i(deferredShader.uniforms["shadowMap"], 2);
-        
+
         var invProjectionMatrix = mat4.create();
         mat4.inverse(projectionMatrix, invProjectionMatrix);
         gl.uniformMatrix4fv(deferredShader.uniforms["invProjectionMatrix"], false, invProjectionMatrix);
         gl.activeTexture(gl.TEXTURE0);
-        
+
         var invModelViewMatrix = mat4.create();
         mat4.inverse(modelViewMatrix, invModelViewMatrix);
         gl.uniformMatrix4fv(deferredShader.uniforms["invModelViewMatrix"], false, invModelViewMatrix);
     }
     function setShadowMapUniforms(face) {
         gl.uniformMatrix4fv(shadowMapShader.uniforms["projectionMatrix"], false, shadowMapProjectionMatrix);
-        gl.uniformMatrix4fv(shadowMapShader.uniforms["modelViewMatrix"], false, shadowMapModelViewMatrix[face]);
+        gl.uniformMatrix4fv(shadowMapShader.uniforms["modelViewMatrix"], false, shadowMapModelViewMatrices[face]);
     }
-var shadowMapSize = 512;
-var shadowMapTexture;
-var shadowMapFramebuffer;
-var shadowMapFramebuffers;
+
     function initFramebuffers(width, height) {
 
         normalTexture = gl.createTexture();
@@ -312,12 +340,12 @@ var shadowMapFramebuffers;
         image2.addEventListener('load', function() {
             gl.bindTexture(gl.TEXTURE_2D, normalTexture);
             gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image2);
-			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
             gl.generateMipmap(gl.TEXTURE_2D);
         });
         image2.src = cubeTextureData.normalMap;
-        
+
         cubeTexture = gl.createTexture();
         gl.bindTexture(gl.TEXTURE_2D, cubeTexture);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 255, 255]));
@@ -325,8 +353,8 @@ var shadowMapFramebuffers;
         image.addEventListener('load', function() {
             gl.bindTexture(gl.TEXTURE_2D, cubeTexture);
             gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
-			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
             gl.generateMipmap(gl.TEXTURE_2D);
         });
         image.src = cubeTextureData.data;
@@ -335,7 +363,7 @@ var shadowMapFramebuffers;
         if (!depthExt) {
             console.log("no depth textures");
         }
-        
+
         diffuseTexture = gl.createTexture();
         gl.bindTexture(gl.TEXTURE_2D, diffuseTexture);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
@@ -351,7 +379,7 @@ var shadowMapFramebuffers;
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.FLOAT, null);
-        
+
         depthTexture = gl.createTexture();
         gl.bindTexture(gl.TEXTURE_2D, depthTexture);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
@@ -359,19 +387,19 @@ var shadowMapFramebuffers;
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT, width, height, 0, gl.DEPTH_COMPONENT, gl.UNSIGNED_SHORT, null);
-        
+
         // PRE FRAMEBUFFER
         preFramebuffer = gl.createFramebuffer();
         gl.bindFramebuffer(gl.FRAMEBUFFER, preFramebuffer);
         gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, depthTexture, 0);
         gl.framebufferTexture2D(gl.FRAMEBUFFER, mrtExt.COLOR_ATTACHMENT0_WEBGL, gl.TEXTURE_2D, diffuseTexture, 0);
         gl.framebufferTexture2D(gl.FRAMEBUFFER, mrtExt.COLOR_ATTACHMENT1_WEBGL, gl.TEXTURE_2D, normalDepthTexture, 0);
-        
+
         mrtExt.drawBuffersWEBGL([
             mrtExt.COLOR_ATTACHMENT0_WEBGL,
             mrtExt.COLOR_ATTACHMENT1_WEBGL
         ]);
-        
+
         shadowMapFramebuffer = gl.createFramebuffer();
         gl.bindFramebuffer(gl.FRAMEBUFFER, shadowMapFramebuffer);
         // SHADOW MAP STUFF
@@ -381,11 +409,11 @@ var shadowMapFramebuffers;
         gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
         gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
         gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-        
+
         for (var i = 0; i < 6; i++) {
             gl.texImage2D(gl.TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, gl.RGBA, shadowMapSize, shadowMapSize, 0, gl.RGBA, gl.FLOAT, null);
         }
-        
+
         var shadowMapDepthBuffer = gl.createRenderbuffer();
         gl.bindRenderbuffer(gl.RENDERBUFFER, shadowMapDepthBuffer);
         gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, shadowMapSize, shadowMapSize);
@@ -399,12 +427,12 @@ var shadowMapFramebuffers;
             gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_CUBE_MAP_POSITIVE_X + i, shadowMapTexture, 0);
             gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, shadowMapDepthBuffer);
         }
-        
+
         gl.bindTexture(gl.TEXTURE_2D, null);
         gl.bindRenderbuffer(gl.RENDERBUFFER, null);
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     }
-    
+
     function handleInput(delta) {
         if (isKeyDown(38) || isKeyDown(87)) { // UP / W
             camera.move([0, 0, moveSpeed * delta]);
@@ -437,19 +465,19 @@ var shadowMapFramebuffers;
         chunk._blocks[9][7][8].SetActive(true);
         chunk._blocks[9][7][9].SetActive(true);
         chunk._blocks[8][7][9].SetActive(true);
-        
+
         chunk._blocks[1][7][8].SetActive(true);
         chunk._blocks[1][8][8].SetActive(true);
         chunk._blocks[1][9][8].SetActive(true);
-        
+
         chunk._blocks[3][7][8].SetActive(true);
         chunk._blocks[3][8][8].SetActive(true);
         chunk._blocks[3][9][8].SetActive(true);
-        
+
         chunk._blocks[5][7][8].SetActive(true);
         chunk._blocks[5][8][8].SetActive(true);
         chunk._blocks[5][9][8].SetActive(true);
-        
+
         for (var i = 0; i < Chunk.SIZE; i++) {
             for (var j = 0; j < Chunk.SIZE; j++) {
                 chunk._blocks[i][6][j].SetActive(true); // Floor
@@ -460,18 +488,19 @@ var shadowMapFramebuffers;
         chunk.CreateMesh();
         chunks.push(chunk);
     }
-    
+
     function drawScene() {
         gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
 
-        mat4.perspective(45, gl.viewportWidth / gl.viewportHeight, 0.1, 100.0, projectionMatrix);
+        mat4.perspective(45, gl.viewportWidth / gl.viewportHeight, 0.1, sceneFarPlane, projectionMatrix);
 
         modelViewMatrix = camera.viewMatrix();
-        
+
         mat4.multiplyVec3(modelViewMatrix, lightPos, viewSpaceLightPos);
 
         gl.bindFramebuffer(gl.FRAMEBUFFER, preFramebuffer);
         gl.enable(gl.DEPTH_TEST);
+        gl.clearColor(0, 0, 0, 100.0);
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
         gl.useProgram(preShader);
@@ -486,83 +515,80 @@ var shadowMapFramebuffers;
             chunks[i].Render(preShader);
         }
     }
-    var lightPos = [8, 8, 8];
-    var shadowMapModelViewMatrix = new Array();
-    var shadowMapProjectionMatrix = new Array();
+
     function drawShadowMap() {
-        mat4.perspective(90, 1, 0.1, 100.0, shadowMapProjectionMatrix);
-        shadowMapModelViewMatrix[0] = mat4.lookAt(lightPos, [lightPos[0] + 1, lightPos[1], lightPos[2]], [0, -1,  0]);
-        shadowMapModelViewMatrix[1] = mat4.lookAt(lightPos, [lightPos[0] - 1, lightPos[1], lightPos[2]], [0, -1,  0]);
-        shadowMapModelViewMatrix[2] = mat4.lookAt(lightPos, [lightPos[0], lightPos[1] + 1, lightPos[2]], [0,  0,  1]);
-        shadowMapModelViewMatrix[3] = mat4.lookAt(lightPos, [lightPos[0], lightPos[1] - 1, lightPos[2]], [0,  0, -1]);
-        shadowMapModelViewMatrix[4] = mat4.lookAt(lightPos, [lightPos[0], lightPos[1], lightPos[2] + 1], [0, -1,  0]);
-        shadowMapModelViewMatrix[5] = mat4.lookAt(lightPos, [lightPos[0], lightPos[1], lightPos[2] - 1], [0, -1,  0]);
-        
+        mat4.perspective(90, 1, 0.1, shadowMapFarPlane, shadowMapProjectionMatrix);
+        shadowMapModelViewMatrices[0] = mat4.lookAt(lightPos, [lightPos[0] + 1, lightPos[1], lightPos[2]], [0, -1,  0]);
+        shadowMapModelViewMatrices[1] = mat4.lookAt(lightPos, [lightPos[0] - 1, lightPos[1], lightPos[2]], [0, -1,  0]);
+        shadowMapModelViewMatrices[2] = mat4.lookAt(lightPos, [lightPos[0], lightPos[1] + 1, lightPos[2]], [0,  0,  1]);
+        shadowMapModelViewMatrices[3] = mat4.lookAt(lightPos, [lightPos[0], lightPos[1] - 1, lightPos[2]], [0,  0, -1]);
+        shadowMapModelViewMatrices[4] = mat4.lookAt(lightPos, [lightPos[0], lightPos[1], lightPos[2] + 1], [0, -1,  0]);
+        shadowMapModelViewMatrices[5] = mat4.lookAt(lightPos, [lightPos[0], lightPos[1], lightPos[2] - 1], [0, -1,  0]);
+
+        gl.clearColor(shadowMapFarPlane, shadowMapFarPlane, shadowMapFarPlane, shadowMapFarPlane);
         gl.viewport(0, 0, shadowMapSize, shadowMapSize);
         for (var i = 0; i < 6; i++) {
             gl.bindFramebuffer(gl.FRAMEBUFFER, shadowMapFramebuffers[i]);
             gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
             gl.enable(gl.DEPTH_TEST);
-            
+
             gl.useProgram(shadowMapShader);
             setShadowMapUniforms(i);
-            
+
             for (var j = 0; j < chunks.length; j++) {
                 chunks[j].SetPositions(shadowMapShader);
                 chunks[j].Render(shadowMapShader);
             }
         }
     }
-    
-    function render() {
-        drawScene();
-        drawShadowMap();
-        
+
+    function drawDeferred() {
         gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-        // Bind framebuffer
         gl.useProgram(deferredShader);
-        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
         setDeferredUniforms();
         drawFullscreenQuad(deferredShader);
     }
-    
+
+    function render() {
+        drawScene();
+        drawShadowMap();
+        drawDeferred();
+    }
+
     function webGLStart() {
-        
+
         // Init everything
         var canvas = document.getElementById("canvas");
         initGL(canvas);
         initShaders();
         initFramebuffers(gl.viewportWidth, gl.viewportHeight);
         setupScene();
-        
+
         // Setup permanent stuff
-        gl.clearColor(100/255, 149/255, 237/255, 1.0);
-        gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
         gl.cullFace(gl.BACK);
         gl.enable(gl.CULL_FACE);
-        
+
         var time = 0;
-        
+
         // Start the game loop
         var last = performance.now();
         (function gameLoop(now){
             var delta = now - last;
             displayFPS(delta);
-            
+
             handleInput(delta/targetDelta);
             render();
-            
+
             time += delta;
             lightPos[0] = 8 + Math.sin(time / 1000.0);
-            
-            
+
             last = now;
 
             requestAnimationFrame(gameLoop);
         })(performance.now());
     }
-    
+
     var fpsCounter = new Array(10);
     var fpsIterations = 0;
     function displayFPS(delta) {
