@@ -109,12 +109,17 @@
     varying vec3 farPlaneRay;
 
     uniform vec3 viewSpaceLightPos;
+    uniform mat4 projectionMatrix;
     uniform mat4 invModelViewMatrix;
     uniform mat4 invProjectionMatrix;
 
     uniform sampler2D normalDepthTexture;
     uniform sampler2D diffuseTexture;
     uniform samplerCube shadowMap;
+    
+    #define NUM_SSAO_SAMPLES 64
+    uniform sampler2D noiseTexture;
+    uniform vec3 hemisphere[NUM_SSAO_SAMPLES];
 
     vec3 ambientLight = vec3(0.3, 0.3, 0.3);
     vec3 diffuseLight = vec3(0.9, 0.9, 0.5);
@@ -193,9 +198,37 @@
             }
         }
         crepuscularRays * length(viewSpacePosition);
+        
+        // SSAO Implementation (http://john-chapman-graphics.blogspot.co.il/2013/01/ssao-tutorial.html)
+        // TODO: Move scaling with render target size to uniforms
+        // TODO: Move to separate shader for blur passes
+        // TODO: Move radius to uniform
+        vec3 randomVec = texture2D(noiseTexture, texCoord * vec2(1280.0/4.0, 720.0/4.0)).xyz;
+        vec3 tangent = normalize(randomVec - normal * dot(randomVec, normal));
+        vec3 bitangent = cross(normal, tangent);
+        mat3 invTBN = mat3(tangent, bitangent, normal);
+        
+        float radius = 0.75;
+        float occlusion = 0.0;
+        
+        for (int i = 0; i < NUM_SSAO_SAMPLES; i++) {
+            vec3 sample = invTBN * hemisphere[i];
+            sample = sample * radius + viewSpacePosition;
+            
+            vec4 offset = vec4(sample, 1.0);
+            offset = projectionMatrix * offset;
+            offset.xy /= offset.w;
+            offset.xy = offset.xy * 0.5 + 0.5;
+            
+            float sampleDepth = -texture2D(normalDepthTexture, offset.xy).a;
+            
+            float rangeCheck = abs(viewSpacePosition.z - sampleDepth) < radius ? 1.0 : 0.0;
+            occlusion += (sampleDepth > sample.z ? 1.0 : 0.0) * rangeCheck;
+        }
+        occlusion = 1.0 - occlusion / float(NUM_SSAO_SAMPLES);
 
         gl_FragColor = vec4(vec3(0)
-        + ambient
+        + ambient * vec3(occlusion)
         + diffuse * visibility
         + specular * visibility
         + crepuscularRays
@@ -288,7 +321,7 @@
             "deferred-vs",
             "deferred-fs",
             ["position"],
-            ["normalDepthTexture", "diffuseTexture", "viewSpaceLightPos", "invProjectionMatrix", "shadowMap", "invModelViewMatrix"]
+            ["normalDepthTexture", "diffuseTexture", "viewSpaceLightPos", "invProjectionMatrix", "shadowMap", "invModelViewMatrix", "noiseTexture", "hemisphere", "projectionMatrix"]
         );
     }
 
@@ -315,6 +348,12 @@
         gl.bindTexture(gl.TEXTURE_CUBE_MAP, shadowMapTexture);
         gl.uniform1i(deferredShader.uniforms["shadowMap"], 2);
 
+        gl.activeTexture(gl.TEXTURE3);
+        gl.bindTexture(gl.TEXTURE_2D, noiseTexture);
+        gl.uniform1i(deferredShader.uniforms["noiseTexture"], 3);
+        gl.uniform3fv(deferredShader.uniforms["hemisphere"], hemisphereArray);
+        gl.uniformMatrix4fv(deferredShader.uniforms["projectionMatrix"], false, projectionMatrix);
+        
         var invProjectionMatrix = mat4.create();
         mat4.inverse(projectionMatrix, invProjectionMatrix);
         gl.uniformMatrix4fv(deferredShader.uniforms["invProjectionMatrix"], false, invProjectionMatrix);
@@ -540,7 +579,45 @@
             }
         }
     }
-
+var noiseTexture;
+var hemisphereArray;
+    function generateSSAOhemisphere() {
+        var hemisphereSize = 64;
+        hemisphereArray = new Array();
+        for (var i = 0; i < hemisphereSize; i++) {
+            var hemisphere = [
+                Math.random() * 2 - 1,
+                Math.random() * 2 - 1,
+                Math.random()
+            ];
+            vec3.normalize(hemisphere);
+            vec3.scale(hemisphere, Math.random());
+            
+            var scale = i / hemisphereSize;
+            scale = (1 - scale * scale) * 0.1 + scale * scale; // Lerp
+            vec3.scale(hemisphere, scale);
+            hemisphereArray = hemisphereArray.concat(hemisphere);
+        }
+    }
+    function generateSSAONoiseTexture() {
+        var noiseTextureSize = 4;
+        var noiseArray = new Array();
+        for (var i = 0; i < noiseTextureSize * noiseTextureSize * 3; i += 3) {
+            var noise = [
+                Math.random() * 2 - 1,
+                Math.random() * 2 - 1,
+                0
+            ];
+            vec3.normalize(noise);
+            noiseArray = noiseArray.concat(noise);
+        }
+        noiseTexture = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, noiseTexture);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, noiseTextureSize, noiseTextureSize, 0, gl.RGB, gl.FLOAT, new Float32Array(noiseArray));
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    }
+    
     function drawDeferred() {
         gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -564,6 +641,9 @@
         initFramebuffers(gl.viewportWidth, gl.viewportHeight);
         setupScene();
 
+        generateSSAOhemisphere();
+        generateSSAONoiseTexture();
+        
         // Setup permanent stuff
         gl.cullFace(gl.BACK);
         gl.enable(gl.CULL_FACE);
