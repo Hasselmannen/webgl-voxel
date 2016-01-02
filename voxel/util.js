@@ -62,3 +62,36 @@ function isKeyPressed(key) {
 function isKeyDown(key) {
     return keysDown.indexOf(key) > -1;
 }
+
+
+// Frame time statistics (SkipIfZeroCommon library javascript port)
+function frameTimeStats(numSamples, outputElement) {
+    this._samples = new Array(numSamples);
+    this._maxNumSamples = numSamples;
+    this._currentSamples = 0;
+    this._output = outputElement;
+}
+frameTimeStats.prototype.addSample = function(sampleInMillis) {
+    if (this._maxNumSamples == this._currentSamples) {
+        for (var i = 0; i < this._maxNumSamples - 1; i++) {
+            this._samples[i] = this._samples[i + 1];
+        }
+        this._samples[this._maxNumSamples - 1] = sampleInMillis;
+    }
+    else {
+        this._samples[this._currentSamples++] = sampleInMillis;
+    }
+
+    var avg = this._samples.reduce(function(a, b) { return a + b; }) / this._currentSamples;
+    var min = this._samples.reduce(function(a, b) { return Math.min(a, b); });
+    var max = this._samples.reduce(function(a, b) { return Math.max(a, b); });
+    
+    var varianceSum = this._samples.reduce(function(a, b) { return a + Math.pow(b - avg, 2); });
+    var standardDeviation = Math.sqrt(varianceSum / this._currentSamples);
+    
+    this._output.innerHTML = "Last " + this._currentSamples + " frames (ms): " +
+        "Avg: " + avg.toFixed(1) +
+        ", SD: " + standardDeviation.toFixed(1) +
+        ", Min: " + min.toFixed(1) +
+        ", Max: " + max.toFixed(1);
+}

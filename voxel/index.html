@@ -714,10 +714,14 @@ var hemisphereArray;
 
         generateSSAOhemisphere();
         generateSSAONoiseTexture();
-        
+
         // Setup permanent stuff
         gl.cullFace(gl.BACK);
         gl.enable(gl.CULL_FACE);
+
+        var stats1 = new frameTimeStats(10, document.getElementById("fps-text1"));
+        var stats2 = new frameTimeStats(50, document.getElementById("fps-text2"));
+        var stats3 = new frameTimeStats(100, document.getElementById("fps-text3"));
 
         var time = 0;
 
@@ -725,7 +729,10 @@ var hemisphereArray;
         var last = performance.now();
         (function gameLoop(now){
             var delta = now - last;
-            displayFPS(delta);
+            
+            stats1.addSample(delta);
+            stats2.addSample(delta);
+            stats3.addSample(delta);
 
             handleInput(delta/targetDelta);
             render();
@@ -738,25 +745,12 @@ var hemisphereArray;
             requestAnimationFrame(gameLoop);
         })(performance.now());
     }
-
-    var fpsCounter = new Array(10);
-    var fpsIterations = 0;
-    function displayFPS(delta) {
-        var fps = 1000 / delta;
-        fpsCounter.shift();
-        fpsCounter[4] = fps;
-        fpsIterations++;
-        if (fpsIterations % fpsCounter.length === 0) {
-            fpsIterations = 0;
-            var sum = fpsCounter.reduce(function(a, b) {return a + b;});
-            var avg = sum / fpsCounter.length;
-            document.getElementById("fps-text").innerHTML = "FPS: " + avg.toFixed(1);
-        }
-    }
 </script>
 </head>
 <body onload="webGLStart();">
     <canvas id="canvas" style="border: none;" width="1280" height="720"></canvas>
-    <p id="fps-text">FPS: </p>
+    <p id="fps-text1">FPS: </p>
+    <p id="fps-text2">FPS: </p>
+    <p id="fps-text3">FPS: </p>
 </body>
 </html>
