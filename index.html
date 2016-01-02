@@ -69,8 +69,8 @@
     vec2 parallax(vec2 texCoord, vec3 viewDir) {
         // Algorithm:
         // http://www.learnopengl.com/#!Advanced-Lighting/Parallax-Mapping
-        const float MIN_LAYERS = 10.0;
-        const float MAX_LAYERS = 20.0;
+        const float MIN_LAYERS = 16.0;
+        const float MAX_LAYERS = 64.0;
         const float HEIGHT_SCALE = 0.1;
         
         float numLayers = mix(MAX_LAYERS, MIN_LAYERS, abs(dot(vec3(0, 0, 1), viewDir)));
