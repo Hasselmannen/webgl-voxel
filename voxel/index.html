@@ -24,18 +24,29 @@
 
     varying vec3 viewSpacePosition;
     varying mat3 invTBN;
+    varying mat3 TBN;
     varying vec2 texCoord;
 
+    varying vec3 tangentSpacePosition;
+    
     void main(void) {
         viewSpacePosition = vec3(modelViewMatrix * vec4(position, 1));
         gl_Position = projectionMatrix * vec4(viewSpacePosition, 1);
 
-        vec3 viewSpaceNormal = normalize(modelViewMatrix * vec4(normal, 0.0)).xyz;
-        vec3 viewSpaceTangent = normalize(modelViewMatrix * vec4(tangent, 0.0)).xyz;
-        vec3 viewSpaceBitangent = normalize(modelViewMatrix * vec4(bitangent, 0.0)).xyz;
+        vec3 T = normalize(modelViewMatrix * vec4(tangent, 0.0)).xyz;
+        vec3 B = normalize(modelViewMatrix * vec4(bitangent, 0.0)).xyz;
+        vec3 N = normalize(modelViewMatrix * vec4(normal, 0.0)).xyz;
 
-        invTBN = mat3(viewSpaceTangent, viewSpaceBitangent, viewSpaceNormal);
+        invTBN = mat3(T, B, N);
 
+        TBN = mat3(
+            T.x, B.x, N.x,
+            T.y, B.y, N.y,
+            T.z, B.z, N.z
+        );
+        
+        tangentSpacePosition = TBN * viewSpacePosition;
+        
         texCoord = texCoordIn;
     }
 </script>
@@ -46,14 +57,57 @@
 
     uniform sampler2D diffuseTexture;
     uniform sampler2D normalTexture;
+    uniform sampler2D depthMap;
 
     varying vec3 viewSpacePosition;
+    varying vec3 tangentSpacePosition;
+    varying mat3 TBN;
     varying mat3 invTBN;
     varying vec2 texCoord;
 
+    
+    vec2 parallax(vec2 texCoord, vec3 viewDir) {
+        // Algorithm:
+        // http://www.learnopengl.com/#!Advanced-Lighting/Parallax-Mapping
+        const float MIN_LAYERS = 10.0;
+        const float MAX_LAYERS = 20.0;
+        const float HEIGHT_SCALE = 0.1;
+        
+        float numLayers = mix(MAX_LAYERS, MIN_LAYERS, abs(dot(vec3(0, 0, 1), viewDir)));
+        float layerDepth = 1.0 / numLayers;
+        float currentDepth = 0.0;
+        vec2 offset = viewDir.xy / viewDir.z * HEIGHT_SCALE;
+        vec2 deltaTexCoord = offset / numLayers;
+        
+        float prevDepth = texture2D(depthMap, texCoord).r;
+
+        for (float i = 0.0; i < MAX_LAYERS; i += 1.0) {
+            texCoord -= deltaTexCoord;
+            prevDepth = texture2D(depthMap, texCoord).r;
+            currentDepth += layerDepth;
+        
+            if (currentDepth >= prevDepth) {
+                break;
+            }
+        }
+        
+        vec2 prevTexCoord = texCoord + deltaTexCoord;
+        
+        float afterDepth = prevDepth - currentDepth;
+        float beforeDepth = texture2D(depthMap, prevTexCoord).r - currentDepth + layerDepth;
+        float weight = afterDepth / (afterDepth - beforeDepth);
+        
+        return prevTexCoord * weight + texCoord * (1.0 - weight);
+    }
+    
     void main(void) {
-        vec3 normal = normalize(invTBN * (texture2D(normalTexture, texCoord).rgb * 2.0 - 1.0));
-        gl_FragData[0] = texture2D(diffuseTexture, texCoord);
+        vec3 viewDir = normalize(tangentSpacePosition);
+        vec2 newCoord = parallax(texCoord, viewDir);
+        
+        vec3 normal = normalize(invTBN * (texture2D(normalTexture, newCoord).rgb * 2.0 - 1.0));
+
+        // TODO: Consider another pass to get correct depth after parallax mapping
+        gl_FragData[0] = texture2D(diffuseTexture, newCoord);
         gl_FragData[1] = vec4(normal, -viewSpacePosition.z);
     }
 </script>
@@ -309,7 +363,7 @@
             "pre-vs",
             "pre-fs",
             ["position", "normal", "tangent", "bitangent", "texCoordIn"],
-            ["projectionMatrix", "modelViewMatrix", "normalTexture", "diffuseTexture"]
+            ["projectionMatrix", "modelViewMatrix", "normalTexture", "diffuseTexture", "depthMap"]
         );
         shadowMapShader = initShader(
             "shadow-map-vs",
@@ -334,6 +388,9 @@
         gl.activeTexture(gl.TEXTURE1);
         gl.bindTexture(gl.TEXTURE_2D, normalTexture);
         gl.uniform1i(preShader.uniforms["normalTexture"], 1);
+        gl.activeTexture(gl.TEXTURE2);
+        gl.bindTexture(gl.TEXTURE_2D, depthMap);
+        gl.uniform1i(preShader.uniforms["depthMap"], 2);
         gl.activeTexture(gl.TEXTURE0);
     }
     function setDeferredUniforms() {
@@ -396,6 +453,20 @@
         });
         image.src = cubeTextureData.data;
 
+        
+        depthMap = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, depthMap);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 255, 255]));
+        var image3 = new Image();
+        image3.addEventListener('load', function() {
+            gl.bindTexture(gl.TEXTURE_2D, depthMap);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image3);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+            //gl.generateMipmap(gl.TEXTURE_2D);
+        });
+        image3.src = cubeTextureData.depthMap;
+        
         var depthExt = gl.getExtension("WEBGL_depth_texture");
         if (!depthExt) {
             console.log("no depth textures");
