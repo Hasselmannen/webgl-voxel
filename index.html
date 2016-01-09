@@ -251,7 +251,6 @@
                 crepuscularRays += intensity;
             }
         }
-        crepuscularRays * length(viewSpacePosition);
         
         // SSAO Implementation (http://john-chapman-graphics.blogspot.co.il/2013/01/ssao-tutorial.html)
         // TODO: Move scaling with render target size to uniforms
@@ -710,6 +709,7 @@ var hemisphereArray;
         initGL(canvas);
         initShaders();
         initFramebuffers(gl.viewportWidth, gl.viewportHeight);
+
         setupScene();
 
         generateSSAOhemisphere();
@@ -723,6 +723,8 @@ var hemisphereArray;
         var stats2 = new frameTimeStats(50, document.getElementById("fps-text2"));
         var stats3 = new frameTimeStats(100, document.getElementById("fps-text3"));
 
+        var rendererInformation = new rendererInfo(document.getElementById("renderer-info"));
+
         var time = 0;
 
         // Start the game loop
@@ -734,6 +736,8 @@ var hemisphereArray;
             stats2.addSample(delta);
             stats3.addSample(delta);
 
+            rendererInformation.display();
+            
             handleInput(delta/targetDelta);
             render();
 
@@ -749,8 +753,9 @@ var hemisphereArray;
 </head>
 <body onload="webGLStart();">
     <canvas id="canvas" style="border: none;" width="1280" height="720"></canvas>
-    <p id="fps-text1">FPS: </p>
-    <p id="fps-text2">FPS: </p>
-    <p id="fps-text3">FPS: </p>
+    <p id="fps-text1"></p>
+    <p id="fps-text2"></p>
+    <p id="fps-text3"></p>
+    <p id="renderer-info"></p>
 </body>
 </html>
