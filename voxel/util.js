@@ -1,3 +1,6 @@
+// This file currently requires a WebGL context
+// initiated as with variable name "gl"
+
 var fullscreenQuadVertices = [
      1.0,  1.0,
     -1.0,  1.0,
@@ -63,7 +66,6 @@ function isKeyDown(key) {
     return keysDown.indexOf(key) > -1;
 }
 
-
 // Frame time statistics (SkipIfZeroCommon library javascript port)
 function frameTimeStats(numSamples, outputElement) {
     this._samples = new Array(numSamples);
@@ -94,4 +96,19 @@ frameTimeStats.prototype.addSample = function(sampleInMillis) {
         ", SD: " + standardDeviation.toFixed(1) +
         ", Min: " + min.toFixed(1) +
         ", Max: " + max.toFixed(1);
+}
+
+
+// Renderer information
+function rendererInfo(outputElement) {
+    this._output = outputElement;
+    this._ext = gl.getExtension("WEBGL_debug_renderer_info");
+}
+rendererInfo.prototype.display = function() {
+    if (this._ext != null) {
+        this._output.innerHTML = "Renderer info: " + gl.getParameter(this._ext.UNMASKED_RENDERER_WEBGL);
+    }
+    else {
+        this._output.innerHTML = "ERROR: Cannot display renderer info (WEBGL_debug_renderer_info not supported)."
+    }
 }
