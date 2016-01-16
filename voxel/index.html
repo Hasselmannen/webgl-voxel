@@ -22,6 +22,7 @@
     uniform mat4 modelViewMatrix;
     uniform mat4 projectionMatrix;
 
+    varying vec3 viewSpaceNormal;
     varying vec3 viewSpacePosition;
     varying mat3 invTBN;
     varying mat3 TBN;
@@ -31,6 +32,7 @@
     
     void main(void) {
         viewSpacePosition = vec3(modelViewMatrix * vec4(position, 1));
+        viewSpaceNormal = vec3(modelViewMatrix * vec4(normal, 0));
         gl_Position = projectionMatrix * vec4(viewSpacePosition, 1);
 
         vec3 T = normalize(modelViewMatrix * vec4(tangent, 0.0)).xyz;
@@ -59,20 +61,24 @@
     uniform sampler2D normalTexture;
     uniform sampler2D depthMap;
 
+    varying vec3 viewSpaceNormal;
     varying vec3 viewSpacePosition;
     varying vec3 tangentSpacePosition;
     varying mat3 TBN;
     varying mat3 invTBN;
     varying vec2 texCoord;
-
+    
+    #define PARALLAX_MAPPING
+    #define MIN_LAYERS 16.0
+    #define MAX_LAYERS 64.0
+    #define HEIGHT_SCALE 0.1
+    
+    #define NORMAL_MAPPING
+    #define DIFFUSE_TEXTURE
     
     vec2 parallax(vec2 texCoord, vec3 viewDir) {
         // Algorithm:
         // http://www.learnopengl.com/#!Advanced-Lighting/Parallax-Mapping
-        const float MIN_LAYERS = 16.0;
-        const float MAX_LAYERS = 64.0;
-        const float HEIGHT_SCALE = 0.1;
-        
         float numLayers = mix(MAX_LAYERS, MIN_LAYERS, abs(dot(vec3(0, 0, 1), viewDir)));
         float layerDepth = 1.0 / numLayers;
         float currentDepth = 0.0;
@@ -101,13 +107,27 @@
     }
     
     void main(void) {
+        #ifdef PARALLAX_MAPPING
         vec3 viewDir = normalize(tangentSpacePosition);
         vec2 newCoord = parallax(texCoord, viewDir);
+        #else
+        vec2 newCoord = texCoord;
+        #endif
         
+        #ifdef NORMAL_MAPPING
         vec3 normal = normalize(invTBN * (texture2D(normalTexture, newCoord).rgb * 2.0 - 1.0));
+        #else
+        vec3 normal = normalize(viewSpaceNormal);
+        #endif
 
+        #ifdef DIFFUSE_TEXTURE
+        vec4 diffuseColor = texture2D(diffuseTexture, newCoord);
+        #else
+        vec4 diffuseColor = vec4(0.5, 0.5, 0.5, 1.0);
+        #endif
+        
         // TODO: Consider another pass to get correct depth after parallax mapping
-        gl_FragData[0] = texture2D(diffuseTexture, newCoord);
+        gl_FragData[0] = diffuseColor;
         gl_FragData[1] = vec4(normal, -viewSpacePosition.z);
     }
 </script>
@@ -170,7 +190,8 @@
     uniform sampler2D normalDepthTexture;
     uniform sampler2D diffuseTexture;
     uniform samplerCube shadowMap;
-    
+
+    #define ENABLE_SSAO
     #define NUM_SSAO_SAMPLES 64
     uniform sampler2D noiseTexture;
     uniform vec3 hemisphere[NUM_SSAO_SAMPLES];
@@ -184,7 +205,8 @@
 
     const float EPS1 = 0.0;
     const float EPS2 = 0.25;
-    const int NUM_CREPUSCULAR_SAMPLES = 100;
+    
+    #define NUM_CREPUSCULAR_SAMPLES 100
 
     vec3 calculateAmbient(vec3 ambientLight, vec3 materialAmbient) {
         return ambientLight * materialAmbient;
@@ -261,9 +283,9 @@
         vec3 bitangent = cross(normal, tangent);
         mat3 invTBN = mat3(tangent, bitangent, normal);
         
-        float radius = 0.75;
         float occlusion = 0.0;
-        
+        #ifdef ENABLE_SSAO
+        float radius = 0.75;
         for (int i = 0; i < NUM_SSAO_SAMPLES; i++) {
             vec3 sample = invTBN * hemisphere[i];
             sample = sample * radius + viewSpacePosition;
@@ -278,8 +300,10 @@
             float rangeCheck = abs(viewSpacePosition.z - sampleDepth) < radius ? 1.0 : 0.0;
             occlusion += (sampleDepth > sample.z ? 1.0 : 0.0) * rangeCheck;
         }
-        occlusion = 1.0 - occlusion / float(NUM_SSAO_SAMPLES);
-
+        occlusion /= float(NUM_SSAO_SAMPLES);
+        #endif
+        occlusion = 1.0 - occlusion;
+        
         gl_FragColor = vec4(vec3(0)
         + ambient * vec3(occlusion)
         + diffuse * visibility
@@ -342,6 +366,8 @@
 
         gl.useProgram(shader);
 
+        shader.vs = vs;
+        shader.fs = fs;
         shader.attributes = {};
         shader.uniforms = {};
 
@@ -357,6 +383,11 @@
         return shader;
     }
 
+    function reloadShader(shader) {
+        gl.deleteProgram(shader);
+        return initShader(shader.vs, shader.fs, Object.keys(shader.attributes), Object.keys(shader.uniforms));
+    }
+    
     function initShaders() {
         preShader = initShader(
             "pre-vs",
@@ -649,12 +680,12 @@
             }
         }
     }
+var numSSAOSamples = 64;
 var noiseTexture;
 var hemisphereArray;
     function generateSSAOhemisphere() {
-        var hemisphereSize = 64;
         hemisphereArray = new Array();
-        for (var i = 0; i < hemisphereSize; i++) {
+        for (var i = 0; i < numSSAOSamples; i++) {
             var hemisphere = [
                 Math.random() * 2 - 1,
                 Math.random() * 2 - 1,
@@ -663,7 +694,7 @@ var hemisphereArray;
             vec3.normalize(hemisphere);
             vec3.scale(hemisphere, Math.random());
             
-            var scale = i / hemisphereSize;
+            var scale = i / numSSAOSamples;
             scale = (1 - scale * scale) * 0.1 + scale * scale; // Lerp
             vec3.scale(hemisphere, scale);
             hemisphereArray = hemisphereArray.concat(hemisphere);
@@ -737,7 +768,7 @@ var hemisphereArray;
             stats3.addSample(delta);
 
             rendererInformation.display();
-            
+
             handleInput(delta/targetDelta);
             render();
 
@@ -757,5 +788,79 @@ var hemisphereArray;
     <p id="fps-text2"></p>
     <p id="fps-text3"></p>
     <p id="renderer-info"></p>
+    
+    <p>
+        <label for="number-god-ray-samples">Number of God Ray samples:</label>
+        <input type="number" id="number-god-ray-samples" min="0" max="100" value="100" />
+    </p>
+    <p>
+        <label for="number-ssao-samples">Number of SSAO samples:</label>
+        <input type="number" id="number-ssao-samples" min="0" max="100" value="64" />
+    </p>
+    <p>
+        <label for="enable-parallax">Enable Parallax Mapping: </label>
+        <input type="checkbox" id="enable-parallax" checked />
+    </p>
+        <p>
+        <label for="enable-normal-mapping">Enable Normal Mapping: </label>
+        <input type="checkbox" id="enable-normal-mapping" checked />
+    </p>
+        <p>
+        <label for="enable-diffuse-texture">Enable Diffuse Texture: </label>
+        <input type="checkbox" id="enable-diffuse-texture" checked />
+    </p>
+    <script type="text/javascript">
+    
+    function setDefined(shaderElem, define, string, value) {
+        shaderElem.innerHTML = shaderElem.text.replace(
+            new RegExp("(#undef|#define)\\s+" + string + "( +\\S+)?"),
+            (define ? "#define " : "#undef ") + string + (value != null ? " " + value : "")
+        );
+    }
+    
+    var numGodRaySamplesInput = document.getElementById("number-god-ray-samples");
+    var numSSAOSamplesInput = document.getElementById("number-ssao-samples");
+    var parallaxInput = document.getElementById("enable-parallax");
+    var normalMappingInput = document.getElementById("enable-normal-mapping");
+    var diffuseTextureInput = document.getElementById("enable-diffuse-texture");
+    
+    numGodRaySamplesInput.onchange = function() {
+        setDefined(document.getElementById("deferred-fs"), true,
+                   "NUM_CREPUSCULAR_SAMPLES",
+                   numGodRaySamplesInput.value);
+        deferredShader = reloadShader(deferredShader);
+    }
+
+    numSSAOSamplesInput.onchange = function() {
+        var value = numSSAOSamplesInput.value;
+        numSSAOSamples = value;
+        if (value == null || value <= 0) {
+            setDefined(document.getElementById("deferred-fs"), false, "ENABLE_SSAO");
+        }
+        else {
+            setDefined(document.getElementById("deferred-fs"), true, "ENABLE_SSAO");
+            setDefined(document.getElementById("deferred-fs"), true,
+                       "NUM_SSAO_SAMPLES",
+                       value);
+        }
+        deferredShader = reloadShader(deferredShader);
+    }
+    
+    parallaxInput.onchange = function() {
+        setDefined(document.getElementById("pre-fs"), parallaxInput.checked, "PARALLAX_MAPPING");
+        preShader = reloadShader(preShader);
+    }
+    
+    normalMappingInput.onchange = function() {
+        setDefined(document.getElementById("pre-fs"), normalMappingInput.checked, "NORMAL_MAPPING");
+        preShader = reloadShader(preShader);
+    }
+    
+    diffuseTextureInput.onchange = function() {
+        setDefined(document.getElementById("pre-fs"), diffuseTextureInput.checked, "DIFFUSE_TEXTURE");
+        preShader = reloadShader(preShader);
+    }
+    
+    </script>
 </body>
 </html>
