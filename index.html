@@ -595,33 +595,33 @@
 
     function setupScene() {
         var chunk = new Chunk();
-        chunk._blocks[7][8][7].SetActive(true);
-        chunk._blocks[7][9][7].SetActive(true);
-        chunk._blocks[7][9][8].SetActive(true);
-        chunk._blocks[8][9][7].SetActive(true);
+        chunk.SetActive(7, 8, 7, true);
+        chunk.SetActive(7, 9, 7, true);
+        chunk.SetActive(7, 9, 8, true);
+        chunk.SetActive(8, 9, 7, true);
 
-        chunk._blocks[9][8][9].SetActive(true);
-        chunk._blocks[9][7][8].SetActive(true);
-        chunk._blocks[9][7][9].SetActive(true);
-        chunk._blocks[8][7][9].SetActive(true);
+        chunk.SetActive(9, 8, 9, true);
+        chunk.SetActive(9, 7, 8, true);
+        chunk.SetActive(9, 7, 9, true);
+        chunk.SetActive(8, 7, 9, true);
 
-        chunk._blocks[1][7][8].SetActive(true);
-        chunk._blocks[1][8][8].SetActive(true);
-        chunk._blocks[1][9][8].SetActive(true);
+        chunk.SetActive(1, 7, 8, true);
+        chunk.SetActive(1, 8, 8, true);
+        chunk.SetActive(1, 9, 8, true);
 
-        chunk._blocks[3][7][8].SetActive(true);
-        chunk._blocks[3][8][8].SetActive(true);
-        chunk._blocks[3][9][8].SetActive(true);
+        chunk.SetActive(3, 7, 8, true);
+        chunk.SetActive(3, 8, 8, true);
+        chunk.SetActive(3, 9, 8, true);
 
-        chunk._blocks[5][7][8].SetActive(true);
-        chunk._blocks[5][8][8].SetActive(true);
-        chunk._blocks[5][9][8].SetActive(true);
+        chunk.SetActive(5, 7, 8, true);
+        chunk.SetActive(5, 8, 8, true);
+        chunk.SetActive(5, 9, 8, true);
 
         for (var i = 0; i < Chunk.SIZE; i++) {
             for (var j = 0; j < Chunk.SIZE; j++) {
-                chunk._blocks[i][6][j].SetActive(true); // Floor
-                chunk._blocks[i][10][j].SetActive(true); // Ceiling
-                chunk._blocks[i][j][6].SetActive(true); // Far wall
+                chunk.SetActive(i, 6, j, true); // Floor
+                chunk.SetActive(i, 10, j, true); // Ceiling
+                chunk.SetActive(i, j, 6, true); // Far wall
             }
         }
         chunk.CreateMesh();

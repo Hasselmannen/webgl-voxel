@@ -159,6 +159,9 @@ function Chunk() {
         }
     }
 }
+Chunk.prototype.SetActive = function(x, y, z, active) {
+    this._blocks[x][y][z].SetActive(active);
+}
 Chunk.prototype.CreateMesh = function() {
     var createdVoxels = 0;
     for (var x = 0; x < Chunk.SIZE; x++) {
