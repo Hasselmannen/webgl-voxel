@@ -10,314 +10,13 @@
 <script type="text/javascript" src="util.js"></script>
 <script type="text/javascript" src="texture.js"></script>
 
-<script id="pre-vs" type="x-shader/x-vertex">
-    precision highp float;
-
-    attribute vec3 position;
-    attribute vec3 normal;
-    attribute vec3 tangent;
-    attribute vec3 bitangent;
-    attribute vec2 texCoordIn;
-
-    uniform mat4 modelViewMatrix;
-    uniform mat4 projectionMatrix;
-
-    varying vec3 viewSpaceNormal;
-    varying vec3 viewSpacePosition;
-    varying mat3 invTBN;
-    varying mat3 TBN;
-    varying vec2 texCoord;
-
-    varying vec3 tangentSpacePosition;
-    
-    void main(void) {
-        viewSpacePosition = vec3(modelViewMatrix * vec4(position, 1));
-        viewSpaceNormal = vec3(modelViewMatrix * vec4(normal, 0));
-        gl_Position = projectionMatrix * vec4(viewSpacePosition, 1);
-
-        vec3 T = normalize(modelViewMatrix * vec4(tangent, 0.0)).xyz;
-        vec3 B = normalize(modelViewMatrix * vec4(bitangent, 0.0)).xyz;
-        vec3 N = normalize(modelViewMatrix * vec4(normal, 0.0)).xyz;
-
-        invTBN = mat3(T, B, N);
-
-        TBN = mat3(
-            T.x, B.x, N.x,
-            T.y, B.y, N.y,
-            T.z, B.z, N.z
-        );
-        
-        tangentSpacePosition = TBN * viewSpacePosition;
-        
-        texCoord = texCoordIn;
-    }
-</script>
-<script id="pre-fs" type="x-shader/x-fragment">
-    #extension GL_EXT_draw_buffers : require
-
-    precision highp float;
-
-    uniform sampler2D diffuseTexture;
-    uniform sampler2D normalTexture;
-    uniform sampler2D depthMap;
-
-    varying vec3 viewSpaceNormal;
-    varying vec3 viewSpacePosition;
-    varying vec3 tangentSpacePosition;
-    varying mat3 TBN;
-    varying mat3 invTBN;
-    varying vec2 texCoord;
-    
-    #define PARALLAX_MAPPING
-    #define MIN_LAYERS 16.0
-    #define MAX_LAYERS 64.0
-    #define HEIGHT_SCALE 0.1
-    
-    #define NORMAL_MAPPING
-    #define DIFFUSE_TEXTURE
-    
-    vec2 parallax(vec2 texCoord, vec3 viewDir) {
-        // Algorithm:
-        // http://www.learnopengl.com/#!Advanced-Lighting/Parallax-Mapping
-        float numLayers = mix(MAX_LAYERS, MIN_LAYERS, abs(dot(vec3(0, 0, 1), viewDir)));
-        float layerDepth = 1.0 / numLayers;
-        float currentDepth = 0.0;
-        vec2 offset = viewDir.xy / viewDir.z * HEIGHT_SCALE;
-        vec2 deltaTexCoord = offset / numLayers;
-        
-        float prevDepth = texture2D(depthMap, texCoord).r * 2.0 - 1.0;
-
-        for (float i = 0.0; i < MAX_LAYERS; i += 1.0) {
-            texCoord -= deltaTexCoord;
-            prevDepth = texture2D(depthMap, texCoord).r * 2.0 - 1.0;
-            currentDepth += layerDepth;
-        
-            if (currentDepth >= prevDepth) {
-                break;
-            }
-        }
-        
-        vec2 prevTexCoord = texCoord + deltaTexCoord;
-        
-        float afterDepth = prevDepth - currentDepth;
-        float beforeDepth = texture2D(depthMap, prevTexCoord).r - currentDepth + layerDepth;
-        float weight = afterDepth / (afterDepth - beforeDepth);
-        
-        return prevTexCoord * weight + texCoord * (1.0 - weight);
-    }
-    
-    void main(void) {
-        #ifdef PARALLAX_MAPPING
-        vec3 viewDir = normalize(tangentSpacePosition);
-        vec2 newCoord = parallax(texCoord, viewDir);
-        #else
-        vec2 newCoord = texCoord;
-        #endif
-        
-        #ifdef NORMAL_MAPPING
-        vec3 normal = normalize(invTBN * (texture2D(normalTexture, newCoord).rgb * 2.0 - 1.0));
-        #else
-        vec3 normal = normalize(viewSpaceNormal);
-        #endif
-
-        #ifdef DIFFUSE_TEXTURE
-        vec4 diffuseColor = texture2D(diffuseTexture, newCoord);
-        #else
-        vec4 diffuseColor = vec4(0.5, 0.5, 0.5, 1.0);
-        #endif
-        
-        // TODO: Consider another pass to get correct depth after parallax mapping
-        gl_FragData[0] = diffuseColor;
-        gl_FragData[1] = vec4(normal, -viewSpacePosition.z);
-    }
-</script>
-
-<script id="shadow-map-vs" type="x-shader/x-vertex">
-    precision highp float;
-
-    attribute vec3 position;
-
-    uniform mat4 projectionMatrix;
-    uniform mat4 modelViewMatrix;
-
-    varying float distance;
-
-    void main(void) {
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        vec3 position = vec3(modelViewMatrix * vec4(position, 1));
-        distance = dot(position, position);
-    }
-</script>
-<script id="shadow-map-fs" type="x-shader/x-fragment">
-    precision highp float;
-
-    varying float distance;
-
-    void main(void) {
-        gl_FragColor = vec4(vec3(distance), 1);
-    }
-</script>
-
-<script id="deferred-vs" type="x-shader/x-vertex">
-    precision highp float;
-
-    attribute vec2 position;
-
-    uniform mat4 invProjectionMatrix;
-
-    varying vec2 texCoord;
-    varying vec3 farPlaneRay;
-
-    const vec2 scale = vec2(0.5, 0.5);
-
-    void main(void) {
-        texCoord = position * scale + scale;
-        farPlaneRay = (invProjectionMatrix * vec4(position, 0.0, 0.0)).xyz;
-        gl_Position = vec4(position, 0.0, 1.0);
-    }
-</script>
-<script id="deferred-fs" type="x-shader/x-fragment">
-    precision highp float;
-
-    varying vec2 texCoord;
-    varying vec3 farPlaneRay;
-
-    uniform vec3 viewSpaceLightPos;
-    uniform mat4 projectionMatrix;
-    uniform mat4 invModelViewMatrix;
-    uniform mat4 invProjectionMatrix;
-
-    uniform sampler2D normalDepthTexture;
-    uniform sampler2D diffuseTexture;
-    uniform samplerCube shadowMap;
-
-    #define ENABLE_SSAO
-    #define NUM_SSAO_SAMPLES 64
-    uniform sampler2D noiseTexture;
-    uniform vec3 hemisphere[NUM_SSAO_SAMPLES];
-
-    vec3 ambientLight = vec3(0.3, 0.3, 0.3);
-    vec3 diffuseLight = vec3(0.9, 0.9, 0.5);
-    vec3 specularLight = vec3(0.9, 0.9, 0.5);
-    vec3 crepuscularLight = vec3(0.225, 0.225, 0.125);
-
-    float materialShininess = 8.0;
-
-    const float EPS1 = 0.0;
-    const float EPS2 = 0.25;
-    
-    #define NUM_CREPUSCULAR_SAMPLES 100
-
-    vec3 calculateAmbient(vec3 ambientLight, vec3 materialAmbient) {
-        return ambientLight * materialAmbient;
-    }
-
-    vec3 calculateDiffuse(vec3 diffuseLight, vec3 materialDiffuse, float diffuseReflectance) {
-        return diffuseLight * materialDiffuse * diffuseReflectance;
-    }
-
-    vec3 calculateFresnel(vec3 materialSpecular, vec3 normal, vec3 directionFromEye) {
-        return materialSpecular + (vec3(1.0) - materialSpecular) * pow(clamp(1.0 + dot(directionFromEye, normal), 0.0, 1.0), 5.0);
-    }
-
-    vec3 calculateSpecular(vec3 specularLight, vec3 materialSpecular, float materialShininess, vec3 normal, vec3 directionToLight, vec3 directionFromEye) {
-        float normalizationFactor = ((materialShininess + 2.0) / 8.0);
-        vec3 h = normalize(directionToLight - directionFromEye);
-        return specularLight * materialSpecular * pow(max(dot(h, normal), 0.0), materialShininess) * normalizationFactor;
-    }
-
-    bool inShadow(samplerCube shadowMap, mat4 invModelViewMatrix, vec3 vectorFromLight, float eps1, float eps2) {
-        float nearestDepth = textureCube(shadowMap, mat3(invModelViewMatrix) * vectorFromLight).r;
-        float distanceSquare = dot(vectorFromLight, vectorFromLight);
-        return distanceSquare > eps1 + eps2 * distanceSquare / 10.0 + nearestDepth;
-    }
-    
-    void main(void) {
-        vec4 normalDepth = texture2D(normalDepthTexture, texCoord);
-        vec4 colorRGBA = texture2D(diffuseTexture, texCoord);
-
-        float depth = normalDepth.a;
-        float alpha = colorRGBA.a;
-        vec3 normal = normalize(normalDepth.rgb);
-        vec3 color = colorRGBA.rgb;
-        vec3 viewSpacePosition = vec3((farPlaneRay * depth).xy, -depth);
-
-        vec3 vectorFromLight = viewSpacePosition - viewSpaceLightPos;
-        vec3 directionToLight = normalize(-vectorFromLight);
-        vec3 directionFromEye = normalize(viewSpacePosition);
-
-        float diffuseReflectance = max(0.0, dot(directionToLight, normal));
-        float visibility = 0.0;
-        if (diffuseReflectance > 0.0 && !inShadow(shadowMap, invModelViewMatrix, vectorFromLight, EPS1, EPS2)) {
-            visibility = 1.0;
-        }
-
-        vec3 fresnel = calculateFresnel(color, normal, directionFromEye);
-
-        vec3 ambient = calculateAmbient(ambientLight, color);
-
-        vec3 diffuse = vec3(0);
-        vec3 specular = vec3(0);
-        if (visibility > 0.01) {
-            diffuse = calculateDiffuse(diffuseLight, color, diffuseReflectance);
-            specular = calculateSpecular(specularLight, fresnel, materialShininess, normal, directionToLight, directionFromEye);
-        }
-        //vec3 emissive = materialEmissive;
-
-        vec3 crepuscularRays = vec3(0);
-        vec3 stepSize = viewSpacePosition / float(NUM_CREPUSCULAR_SAMPLES);
-        vec3 intensity = crepuscularLight / float(NUM_CREPUSCULAR_SAMPLES);
-        for (int i = 0; i < NUM_CREPUSCULAR_SAMPLES; i++) {
-            vec3 pos = stepSize * float(i);
-            if (!inShadow(shadowMap, invModelViewMatrix, pos - viewSpaceLightPos, EPS1, EPS2)) {
-                crepuscularRays += intensity;
-            }
-        }
-        
-        // SSAO Implementation (http://john-chapman-graphics.blogspot.co.il/2013/01/ssao-tutorial.html)
-        // TODO: Move scaling with render target size to uniforms
-        // TODO: Move to separate shader for blur passes
-        // TODO: Move radius to uniform
-        vec3 randomVec = texture2D(noiseTexture, texCoord * vec2(1280.0/4.0, 720.0/4.0)).xyz;
-        vec3 tangent = normalize(randomVec - normal * dot(randomVec, normal));
-        vec3 bitangent = cross(normal, tangent);
-        mat3 invTBN = mat3(tangent, bitangent, normal);
-        
-        float occlusion = 0.0;
-        #ifdef ENABLE_SSAO
-        float radius = 0.75;
-        for (int i = 0; i < NUM_SSAO_SAMPLES; i++) {
-            vec3 sample = invTBN * hemisphere[i];
-            sample = sample * radius + viewSpacePosition;
-            
-            vec4 offset = vec4(sample, 1.0);
-            offset = projectionMatrix * offset;
-            offset.xy /= offset.w;
-            offset.xy = offset.xy * 0.5 + 0.5;
-            
-            float sampleDepth = -texture2D(normalDepthTexture, offset.xy).a;
-            
-            float rangeCheck = abs(viewSpacePosition.z - sampleDepth) < radius ? 1.0 : 0.0;
-            occlusion += (sampleDepth > sample.z ? 1.0 : 0.0) * rangeCheck;
-        }
-        occlusion /= float(NUM_SSAO_SAMPLES);
-        #endif
-        occlusion = 1.0 - occlusion;
-        
-        gl_FragColor = vec4(vec3(0)
-        + ambient * vec3(occlusion)
-        + diffuse * visibility
-        + specular * visibility
-        + crepuscularRays
-        , 1.0);
-    }
-</script>
-
 <script type="text/javascript">
     // Shaders
-    var preShader;
-    var deferredShaderProgram;
-    var shadowMapShader;
+    var shaders = {
+        pre       : { src : "shaders/pre" },
+        deferred  : { src : "shaders/deferred" },
+        shadowmap : { src : "shaders/shadowmap" }
+    };
 
     // Render matrices
     var modelViewMatrix = mat4.create();
@@ -353,106 +52,124 @@
     var moveSpeed = 0.1;
     var rotateSpeed = 0.05;
 
-
-    function initShader(vs, fs, attributes, uniforms) {
-        var shader = gl.createProgram();
-        gl.attachShader(shader, getShader(gl, vs));
-        gl.attachShader(shader, getShader(gl, fs));
-        gl.linkProgram(shader);
-
-        if (!gl.getProgramParameter(shader, gl.LINK_STATUS)) {
-            alert("Could not initialise " + vs + "/" + fs + " shaders!");
+    function linkProgram(gl, shader) {
+        var program = gl.createProgram();
+        var vs = gl.createShader(gl.VERTEX_SHADER);
+        var fs = gl.createShader(gl.FRAGMENT_SHADER);
+        gl.shaderSource(vs, shader.vs);
+        gl.compileShader(vs);
+        
+        if (!gl.getShaderParameter(vs, gl.COMPILE_STATUS)) {
+            alert(shader.src + gl.getShaderInfoLog(vs));
+            return null;
         }
+        
+        gl.shaderSource(fs, shader.fs);
+        gl.compileShader(fs);
+        
+        if (!gl.getShaderParameter(fs, gl.COMPILE_STATUS)) {
+            alert(gl.getShaderInfoLog(fs));
+            return null;
+        }
+        
+        gl.attachShader(program, vs);
+        gl.attachShader(program, fs);
+        gl.linkProgram(program);
+        
+        if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+            alert("Could not initialise shader: " + shader);
+            return null;
+        }
+        
+        return program;
+    }
 
-        gl.useProgram(shader);
+    function initShader(shader, attributes, uniforms) {
+        var program = linkProgram(gl, shader);
+        gl.useProgram(program);
 
-        shader.vs = vs;
-        shader.fs = fs;
-        shader.attributes = {};
-        shader.uniforms = {};
+        program.attributes = {};
+        program.uniforms = {};
 
         for (val of attributes) {
-            shader.attributes[val] = gl.getAttribLocation(shader, val);
-            gl.enableVertexAttribArray(shader.attributes[val]);
+            program.attributes[val] = gl.getAttribLocation(program, val);
+            gl.enableVertexAttribArray(program.attributes[val]);
         }
 
         for (val of uniforms) {
-            shader.uniforms[val] = gl.getUniformLocation(shader, val);
+            program.uniforms[val] = gl.getUniformLocation(program, val);
         }
 
-        return shader;
+        return program;
     }
 
     function reloadShader(shader) {
-        gl.deleteProgram(shader);
-        return initShader(shader.vs, shader.fs, Object.keys(shader.attributes), Object.keys(shader.uniforms));
+        gl.deleteProgram(shader.program);
+        return initShader(shader, Object.keys(shader.program.attributes), Object.keys(shader.program.uniforms));
     }
-    
+
     function initShaders() {
-        preShader = initShader(
-            "pre-vs",
-            "pre-fs",
+        shaders.pre.program = initShader(
+            shaders.pre,
             ["position", "normal", "tangent", "bitangent", "texCoordIn"],
             ["projectionMatrix", "modelViewMatrix", "normalTexture", "diffuseTexture", "depthMap"]
         );
-        shadowMapShader = initShader(
-            "shadow-map-vs",
-            "shadow-map-fs",
+        shaders.shadowmap.program = initShader(
+            shaders.shadowmap,
             ["position"],
             ["projectionMatrix", "modelViewMatrix"]
         );
-        deferredShader = initShader(
-            "deferred-vs",
-            "deferred-fs",
+        shaders.deferred.program = initShader(
+            shaders.deferred,
             ["position"],
             ["normalDepthTexture", "diffuseTexture", "viewSpaceLightPos", "invProjectionMatrix", "shadowMap", "invModelViewMatrix", "noiseTexture", "hemisphere", "projectionMatrix"]
         );
     }
 
     function setPreUniforms() {
-        gl.uniformMatrix4fv(preShader.uniforms["projectionMatrix"], false, projectionMatrix);
-        gl.uniformMatrix4fv(preShader.uniforms["modelViewMatrix"], false, modelViewMatrix);
+        gl.uniformMatrix4fv(shaders.pre.program.uniforms["projectionMatrix"], false, projectionMatrix);
+        gl.uniformMatrix4fv(shaders.pre.program.uniforms["modelViewMatrix"], false, modelViewMatrix);
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, cubeTexture);
-        gl.uniform1i(preShader.uniforms["diffuseTexture"], 0);
+        gl.uniform1i(shaders.pre.program.uniforms["diffuseTexture"], 0);
         gl.activeTexture(gl.TEXTURE1);
         gl.bindTexture(gl.TEXTURE_2D, normalTexture);
-        gl.uniform1i(preShader.uniforms["normalTexture"], 1);
+        gl.uniform1i(shaders.pre.program.uniforms["normalTexture"], 1);
         gl.activeTexture(gl.TEXTURE2);
         gl.bindTexture(gl.TEXTURE_2D, depthMap);
-        gl.uniform1i(preShader.uniforms["depthMap"], 2);
+        gl.uniform1i(shaders.pre.program.uniforms["depthMap"], 2);
         gl.activeTexture(gl.TEXTURE0);
     }
     function setDeferredUniforms() {
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, normalDepthTexture);
-        gl.uniform1i(deferredShader.uniforms["normalDepthTexture"], 0);
+        gl.uniform1i(shaders.deferred.program.uniforms["normalDepthTexture"], 0);
         gl.activeTexture(gl.TEXTURE1);
         gl.bindTexture(gl.TEXTURE_2D, diffuseTexture);
-        gl.uniform1i(deferredShader.uniforms["diffuseTexture"], 1);
-        gl.uniform3fv(deferredShader.uniforms["viewSpaceLightPos"], viewSpaceLightPos);
+        gl.uniform1i(shaders.deferred.program.uniforms["diffuseTexture"], 1);
+        gl.uniform3fv(shaders.deferred.program.uniforms["viewSpaceLightPos"], viewSpaceLightPos);
         gl.activeTexture(gl.TEXTURE2);
         gl.bindTexture(gl.TEXTURE_CUBE_MAP, shadowMapTexture);
-        gl.uniform1i(deferredShader.uniforms["shadowMap"], 2);
+        gl.uniform1i(shaders.deferred.program.uniforms["shadowMap"], 2);
 
         gl.activeTexture(gl.TEXTURE3);
         gl.bindTexture(gl.TEXTURE_2D, noiseTexture);
-        gl.uniform1i(deferredShader.uniforms["noiseTexture"], 3);
-        gl.uniform3fv(deferredShader.uniforms["hemisphere"], hemisphereArray);
-        gl.uniformMatrix4fv(deferredShader.uniforms["projectionMatrix"], false, projectionMatrix);
+        gl.uniform1i(shaders.deferred.program.uniforms["noiseTexture"], 3);
+        gl.uniform3fv(shaders.deferred.program.uniforms["hemisphere"], hemisphereArray);
+        gl.uniformMatrix4fv(shaders.deferred.program.uniforms["projectionMatrix"], false, projectionMatrix);
         
         var invProjectionMatrix = mat4.create();
         mat4.inverse(projectionMatrix, invProjectionMatrix);
-        gl.uniformMatrix4fv(deferredShader.uniforms["invProjectionMatrix"], false, invProjectionMatrix);
+        gl.uniformMatrix4fv(shaders.deferred.program.uniforms["invProjectionMatrix"], false, invProjectionMatrix);
         gl.activeTexture(gl.TEXTURE0);
 
         var invModelViewMatrix = mat4.create();
         mat4.inverse(modelViewMatrix, invModelViewMatrix);
-        gl.uniformMatrix4fv(deferredShader.uniforms["invModelViewMatrix"], false, invModelViewMatrix);
+        gl.uniformMatrix4fv(shaders.deferred.program.uniforms["invModelViewMatrix"], false, invModelViewMatrix);
     }
     function setShadowMapUniforms(face) {
-        gl.uniformMatrix4fv(shadowMapShader.uniforms["projectionMatrix"], false, shadowMapProjectionMatrix);
-        gl.uniformMatrix4fv(shadowMapShader.uniforms["modelViewMatrix"], false, shadowMapModelViewMatrices[face]);
+        gl.uniformMatrix4fv(shaders.shadowmap.program.uniforms["projectionMatrix"], false, shadowMapProjectionMatrix);
+        gl.uniformMatrix4fv(shaders.shadowmap.program.uniforms["modelViewMatrix"], false, shadowMapModelViewMatrices[face]);
     }
 
     function initFramebuffers(width, height) {
@@ -642,16 +359,16 @@
         gl.clearColor(0, 0, 0, 100.0);
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-        gl.useProgram(preShader);
+        gl.useProgram(shaders.pre.program);
         setPreUniforms();
 
         for (var i = 0; i < chunks.length; i++) {
-            chunks[i].SetPositions(preShader);
-            chunks[i].SetNormals(preShader);
-            chunks[i].SetTangents(preShader);
-            chunks[i].SetBitangents(preShader);
-            chunks[i].SetTexCoords(preShader);
-            chunks[i].Render(preShader);
+            chunks[i].SetPositions(shaders.pre.program);
+            chunks[i].SetNormals(shaders.pre.program);
+            chunks[i].SetTangents(shaders.pre.program);
+            chunks[i].SetBitangents(shaders.pre.program);
+            chunks[i].SetTexCoords(shaders.pre.program);
+            chunks[i].Render(shaders.pre.program);
         }
     }
 
@@ -671,12 +388,12 @@
             gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
             gl.enable(gl.DEPTH_TEST);
 
-            gl.useProgram(shadowMapShader);
+            gl.useProgram(shaders.shadowmap.program);
             setShadowMapUniforms(i);
 
             for (var j = 0; j < chunks.length; j++) {
-                chunks[j].SetPositions(shadowMapShader);
-                chunks[j].Render(shadowMapShader);
+                chunks[j].SetPositions(shaders.shadowmap.program);
+                chunks[j].Render(shaders.shadowmap.program);
             }
         }
     }
@@ -718,13 +435,13 @@ var hemisphereArray;
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
     }
-    
+
     function drawDeferred() {
         gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-        gl.useProgram(deferredShader);
+        gl.useProgram(shaders.deferred.program);
         setDeferredUniforms();
-        drawFullscreenQuad(deferredShader);
+        drawFullscreenQuad(shaders.deferred.program);
     }
 
     function render() {
@@ -734,11 +451,11 @@ var hemisphereArray;
     }
 
     function webGLStart() {
-
         // Init everything
         var canvas = document.getElementById("canvas");
         initGL(canvas);
         initShaders();
+        
         initFramebuffers(gl.viewportWidth, gl.viewportHeight);
 
         setupScene();
@@ -780,9 +497,41 @@ var hemisphereArray;
             requestAnimationFrame(gameLoop);
         })(performance.now());
     }
+
+    function init() {
+        loadShaders(webGLStart);
+    }
+    
+    function loadShaders(callback) {
+        var numRequests = 2 * Object.keys(shaders).length;
+        var completedRequests = 0;
+        
+        for (var k in shaders) {
+            ["vs", "fs"].forEach(function(ext) {
+                var httpRequest = new XMLHttpRequest();
+                (function(k) {
+                    httpRequest.onreadystatechange = function() {
+                        if (httpRequest.readyState == XMLHttpRequest.DONE) {
+                            if (httpRequest.status === 200) {
+                                shaders[k][ext] = httpRequest.responseText;
+                                if (++completedRequests >= numRequests) {
+                                    callback();
+                                }
+                            }
+                            else {
+                                alert(shaders[k] + "." + ext + " could not be loaded.");
+                            }
+                        }
+                    };
+                })(k);
+                httpRequest.open("GET", shaders[k].src + "." + ext, true);
+                httpRequest.send();
+            });
+        }
+    }
 </script>
 </head>
-<body onload="webGLStart();">
+<body onload="init();">
     <canvas id="canvas" style="border: none;" width="1280" height="720"></canvas>
     <p id="fps-text1"></p>
     <p id="fps-text2"></p>
@@ -810,9 +559,9 @@ var hemisphereArray;
         <input type="checkbox" id="enable-diffuse-texture" checked />
     </p>
     <script type="text/javascript">
-    
-    function setDefined(shaderElem, define, string, value) {
-        shaderElem.innerHTML = shaderElem.text.replace(
+
+    function setDefined(text, define, string, value) {
+        return text.replace(
             new RegExp("(#undef|#define)\\s+" + string + "( +\\S+)?"),
             (define ? "#define " : "#undef ") + string + (value != null ? " " + value : "")
         );
@@ -825,42 +574,41 @@ var hemisphereArray;
     var diffuseTextureInput = document.getElementById("enable-diffuse-texture");
     
     numGodRaySamplesInput.onchange = function() {
-        setDefined(document.getElementById("deferred-fs"), true,
-                   "NUM_CREPUSCULAR_SAMPLES",
-                   numGodRaySamplesInput.value);
-        deferredShader = reloadShader(deferredShader);
+        shaders.deferred.fs = setDefined(shaders.deferred.fs, true,
+                                         "NUM_CREPUSCULAR_SAMPLES",
+                                         numGodRaySamplesInput.value);
+        shaders.deferred.program = reloadShader(shaders.deferred);
     }
 
     numSSAOSamplesInput.onchange = function() {
         var value = numSSAOSamplesInput.value;
         numSSAOSamples = value;
         if (value == null || value <= 0) {
-            setDefined(document.getElementById("deferred-fs"), false, "ENABLE_SSAO");
+            shaders.deferred.fs = setDefined(shaders.deferred.fs, false, "ENABLE_SSAO");
         }
         else {
-            setDefined(document.getElementById("deferred-fs"), true, "ENABLE_SSAO");
-            setDefined(document.getElementById("deferred-fs"), true,
-                       "NUM_SSAO_SAMPLES",
-                       value);
+            shaders.deferred.fs = setDefined(shaders.deferred.fs, true, "ENABLE_SSAO");
+            shaders.deferred.fs = setDefined(shaders.deferred.fs, true,
+                                             "NUM_SSAO_SAMPLES",
+                                             value);
         }
-        deferredShader = reloadShader(deferredShader);
+        shaders.deferred.program = reloadShader(shaders.deferred);
     }
     
     parallaxInput.onchange = function() {
-        setDefined(document.getElementById("pre-fs"), parallaxInput.checked, "PARALLAX_MAPPING");
-        preShader = reloadShader(preShader);
+        shaders.pre.fs = setDefined(shaders.pre.fs, parallaxInput.checked, "PARALLAX_MAPPING");
+        shaders.pre.program = reloadShader(shaders.pre);
     }
     
     normalMappingInput.onchange = function() {
-        setDefined(document.getElementById("pre-fs"), normalMappingInput.checked, "NORMAL_MAPPING");
-        preShader = reloadShader(preShader);
+        shaders.pre.fs = setDefined(shaders.pre.fs, normalMappingInput.checked, "NORMAL_MAPPING");
+        shaders.pre.program = reloadShader(shaders.pre);
     }
     
     diffuseTextureInput.onchange = function() {
-        setDefined(document.getElementById("pre-fs"), diffuseTextureInput.checked, "DIFFUSE_TEXTURE");
-        preShader = reloadShader(preShader);
+        shaders.pre.fs = setDefined(shaders.pre.fs, diffuseTextureInput.checked, "DIFFUSE_TEXTURE");
+        shaders.pre.program = reloadShader(shaders.pre);
     }
-    
     </script>
 </body>
 </html>
