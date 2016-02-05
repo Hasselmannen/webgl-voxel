@@ -127,49 +127,52 @@
     }
 
     function setPreUniforms() {
-        gl.uniformMatrix4fv(shaders.pre.program.uniforms["projectionMatrix"], false, projectionMatrix);
-        gl.uniformMatrix4fv(shaders.pre.program.uniforms["modelViewMatrix"], false, modelViewMatrix);
+        var p = shaders.pre.program;
+        gl.uniformMatrix4fv(p.uniforms["projectionMatrix"], false, projectionMatrix);
+        gl.uniformMatrix4fv(p.uniforms["modelViewMatrix"], false, modelViewMatrix);
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, cubeTexture);
-        gl.uniform1i(shaders.pre.program.uniforms["diffuseTexture"], 0);
+        gl.uniform1i(p.uniforms["diffuseTexture"], 0);
         gl.activeTexture(gl.TEXTURE1);
         gl.bindTexture(gl.TEXTURE_2D, normalTexture);
-        gl.uniform1i(shaders.pre.program.uniforms["normalTexture"], 1);
+        gl.uniform1i(p.uniforms["normalTexture"], 1);
         gl.activeTexture(gl.TEXTURE2);
         gl.bindTexture(gl.TEXTURE_2D, depthMap);
-        gl.uniform1i(shaders.pre.program.uniforms["depthMap"], 2);
+        gl.uniform1i(p.uniforms["depthMap"], 2);
         gl.activeTexture(gl.TEXTURE0);
     }
     function setDeferredUniforms() {
+        var p = shaders.deferred.program;
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, normalDepthTexture);
-        gl.uniform1i(shaders.deferred.program.uniforms["normalDepthTexture"], 0);
+        gl.uniform1i(p.uniforms["normalDepthTexture"], 0);
         gl.activeTexture(gl.TEXTURE1);
         gl.bindTexture(gl.TEXTURE_2D, diffuseTexture);
-        gl.uniform1i(shaders.deferred.program.uniforms["diffuseTexture"], 1);
-        gl.uniform3fv(shaders.deferred.program.uniforms["viewSpaceLightPos"], viewSpaceLightPos);
+        gl.uniform1i(p.uniforms["diffuseTexture"], 1);
+        gl.uniform3fv(p.uniforms["viewSpaceLightPos"], viewSpaceLightPos);
         gl.activeTexture(gl.TEXTURE2);
         gl.bindTexture(gl.TEXTURE_CUBE_MAP, shadowMapTexture);
-        gl.uniform1i(shaders.deferred.program.uniforms["shadowMap"], 2);
+        gl.uniform1i(p.uniforms["shadowMap"], 2);
 
         gl.activeTexture(gl.TEXTURE3);
         gl.bindTexture(gl.TEXTURE_2D, noiseTexture);
-        gl.uniform1i(shaders.deferred.program.uniforms["noiseTexture"], 3);
-        gl.uniform3fv(shaders.deferred.program.uniforms["hemisphere"], hemisphereArray);
-        gl.uniformMatrix4fv(shaders.deferred.program.uniforms["projectionMatrix"], false, projectionMatrix);
+        gl.uniform1i(p.uniforms["noiseTexture"], 3);
+        gl.uniform3fv(p.uniforms["hemisphere"], hemisphereArray);
+        gl.uniformMatrix4fv(p.uniforms["projectionMatrix"], false, projectionMatrix);
         
         var invProjectionMatrix = mat4.create();
         mat4.inverse(projectionMatrix, invProjectionMatrix);
-        gl.uniformMatrix4fv(shaders.deferred.program.uniforms["invProjectionMatrix"], false, invProjectionMatrix);
+        gl.uniformMatrix4fv(p.uniforms["invProjectionMatrix"], false, invProjectionMatrix);
         gl.activeTexture(gl.TEXTURE0);
 
         var invModelViewMatrix = mat4.create();
         mat4.inverse(modelViewMatrix, invModelViewMatrix);
-        gl.uniformMatrix4fv(shaders.deferred.program.uniforms["invModelViewMatrix"], false, invModelViewMatrix);
+        gl.uniformMatrix4fv(p.uniforms["invModelViewMatrix"], false, invModelViewMatrix);
     }
     function setShadowMapUniforms(face) {
-        gl.uniformMatrix4fv(shaders.shadowmap.program.uniforms["projectionMatrix"], false, shadowMapProjectionMatrix);
-        gl.uniformMatrix4fv(shaders.shadowmap.program.uniforms["modelViewMatrix"], false, shadowMapModelViewMatrices[face]);
+        var p = shaders.shadowmap.program;
+        gl.uniformMatrix4fv(p.uniforms["projectionMatrix"], false, shadowMapProjectionMatrix);
+        gl.uniformMatrix4fv(p.uniforms["modelViewMatrix"], false, shadowMapModelViewMatrices[face]);
     }
 
     function initFramebuffers(width, height) {
