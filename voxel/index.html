@@ -35,6 +35,7 @@
 
     var chunks = new Array();
 
+    // Framebuffers
     var preFramebuffer;
     var shadowMapFramebuffer;
     var shadowMapFramebuffers;
@@ -42,6 +43,7 @@
     var blurHFramebuffer;
     var blurVFramebuffer;
 
+    // Textures
     var normalDepthTexture;
     var normalTexture;
     var diffuseTexture;
@@ -49,7 +51,7 @@
     var depthTexture;
     var shadowMapTexture;
     var ssaoTexture;
-
+    var noiseTexture; // Noise for SSAO
     var blurHTexture;
     var blurVTexture;
 
@@ -63,6 +65,10 @@
     var moveSpeed = 0.1;
     var rotateSpeed = 0.05;
 
+    // SSAO Stuff
+    var numSSAOSamples = 64;
+    var hemisphereArray;
+    
     function linkProgram(gl, shader) {
         var program = gl.createProgram();
         var vs = gl.createShader(gl.VERTEX_SHADER);
@@ -482,9 +488,7 @@
             }
         }
     }
-var numSSAOSamples = 64;
-var noiseTexture;
-var hemisphereArray;
+
     function generateSSAOhemisphere() {
         hemisphereArray = new Array();
         for (var i = 0; i < numSSAOSamples; i++) {
