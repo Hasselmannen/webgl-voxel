@@ -16,7 +16,9 @@
         pre       : { src : "shaders/pre" },
         deferred  : { src : "shaders/deferred" },
         shadowmap : { src : "shaders/shadowmap" },
-        ssao      : { src : "shaders/ssao"}
+        ssao      : { src : "shaders/ssao" },
+        blurH     : { src : "shaders/blur-h" },
+        blurV     : { src : "shaders/blur-v" }
     };
 
     // Render matrices
@@ -36,6 +38,8 @@
     var shadowMapFramebuffer;
     var shadowMapFramebuffers;
     var ssaoFramebuffer;
+    var blurHFramebuffer;
+    var blurVFramebuffer;
 
     var normalDepthTexture;
     var normalTexture;
@@ -44,6 +48,9 @@
     var depthTexture;
     var shadowMapTexture;
     var ssaoTexture;
+    
+    var blurHTexture;
+    var blurVTexture;
 
     var sceneFarPlane = 100;
     var shadowMapFarPlane = 100;
@@ -132,6 +139,16 @@
             ["position"],
             ["normalDepthTexture", "invProjectionMatrix", "projectionMatrix", "noiseTexture", "hemisphere"]
         );
+        shaders.blurH.program = initShader(
+            shaders.blurH,
+            ["position"],
+            ["texture"]
+        );
+        shaders.blurV.program = initShader(
+            shaders.blurV,
+            ["position"],
+            ["texture"]
+        );
     }
 
     function setPreUniforms() {
@@ -162,7 +179,7 @@
         gl.bindTexture(gl.TEXTURE_CUBE_MAP, shadowMapTexture);
         gl.uniform1i(p.uniforms["shadowMap"], 2);
         gl.activeTexture(gl.TEXTURE3);
-        gl.bindTexture(gl.TEXTURE_2D, ssaoTexture);
+        gl.bindTexture(gl.TEXTURE_2D, ssaoBlurTexture);
         gl.uniform1i(p.uniforms["ssaoTexture"], 3);
         
         var invProjectionMatrix = mat4.create();
@@ -196,7 +213,13 @@
         gl.uniformMatrix4fv(p.uniforms["invProjectionMatrix"], false, invProjectionMatrix);
         gl.activeTexture(gl.TEXTURE0);
     }
-
+    // p should be the program with which to blur (i.e. shaders.blurH.program or shaders.blurV.program)
+    function setBlurUniforms(p, texture) {
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.uniform1i(p.uniforms["texture"], 0);
+    }
+    
     function initFramebuffers(width, height) {
 
         normalTexture = gl.createTexture();
@@ -320,6 +343,30 @@
         ssaoFramebuffer = gl.createFramebuffer();
         gl.bindFramebuffer(gl.FRAMEBUFFER, ssaoFramebuffer);
         gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, ssaoTexture, 0);
+
+        blurHTexture = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, blurHTexture);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+
+        blurHFramebuffer = gl.createFramebuffer();
+        gl.bindFramebuffer(gl.FRAMEBUFFER, blurHFramebuffer);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, blurHTexture, 0);
+
+        blurVTexture = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, blurVTexture);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+
+        blurVFramebuffer = gl.createFramebuffer();
+        gl.bindFramebuffer(gl.FRAMEBUFFER, blurVFramebuffer);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, blurVTexture, 0);
 
         gl.bindTexture(gl.TEXTURE_2D, null);
         gl.bindRenderbuffer(gl.RENDERBUFFER, null);
@@ -473,12 +520,32 @@ var hemisphereArray;
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
     }
 
+    var ssaoBlurTexture;
+
+    function blur(origTexture) {
+        var p = shaders.blurH.program;
+        gl.bindFramebuffer(gl.FRAMEBUFFER, blurHFramebuffer);
+        gl.useProgram(p);
+        setBlurUniforms(p, ssaoTexture);
+        drawFullscreenQuad(p);
+
+        p = shaders.blurV.program;
+        gl.bindFramebuffer(gl.FRAMEBUFFER, blurVFramebuffer);
+        gl.useProgram(p);
+        setBlurUniforms(p, blurHTexture);
+        drawFullscreenQuad(p);
+
+        return blurVTexture;
+    }
+    
     function drawSSAO() {
         gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
         gl.bindFramebuffer(gl.FRAMEBUFFER, ssaoFramebuffer);
         gl.useProgram(shaders.ssao.program);
         setSSAOUniforms();
         drawFullscreenQuad(shaders.ssao.program);
+        
+        ssaoBlurTexture = blur(ssaoTexture);
     }
 
     function drawDeferred() {
