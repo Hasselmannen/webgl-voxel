@@ -643,6 +643,14 @@ var hemisphereArray;
         }
     }
 </script>
+
+<style type="text/css">
+    .input-enable {
+        display: inline-block;
+        width: 120px;
+        text-align: right;
+    }
+</style>
 </head>
 <body onload="init();">
     <canvas id="canvas" style="border: none;" width="1280" height="720"></canvas>
@@ -650,27 +658,32 @@ var hemisphereArray;
     <p id="fps-text2"></p>
     <p id="fps-text3"></p>
     <p id="renderer-info"></p>
-    
+    <hr />
     <p>
-        <label for="number-god-ray-samples">Number of God Ray samples:</label>
+        <label class="input-enable" for="enable-god-rays">God Rays:</label>
+        <input type="checkbox" id="enable-god-rays" checked />
+        <label for="number-god-ray-samples">Samples:</label>
         <input type="number" id="number-god-ray-samples" min="0" max="100" value="100" />
     </p>
     <p>
-        <label for="number-ssao-samples">Number of SSAO samples:</label>
+        <label class="input-enable" for="enable-ssao">SSAO:</label>
+        <input type="checkbox" id="enable-ssao" checked />
+        <label for="number-ssao-samples">Samples:</label>
         <input type="number" id="number-ssao-samples" min="0" max="100" value="64" />
     </p>
     <p>
-        <label for="enable-parallax">Enable Parallax Mapping: </label>
+        <label class="input-enable" for="enable-parallax">Parallax Mapping: </label>
         <input type="checkbox" id="enable-parallax" checked />
     </p>
         <p>
-        <label for="enable-normal-mapping">Enable Normal Mapping: </label>
+        <label class="input-enable" for="enable-normal-mapping">Normal Mapping: </label>
         <input type="checkbox" id="enable-normal-mapping" checked />
     </p>
         <p>
-        <label for="enable-diffuse-texture">Enable Diffuse Texture: </label>
+        <label class="input-enable" for="enable-diffuse-texture">Diffuse Texture: </label>
         <input type="checkbox" id="enable-diffuse-texture" checked />
     </p>
+
     <script type="text/javascript">
 
     function setDefined(text, define, string, value) {
@@ -680,46 +693,59 @@ var hemisphereArray;
         );
     }
     
-    var numGodRaySamplesInput = document.getElementById("number-god-ray-samples");
-    var numSSAOSamplesInput = document.getElementById("number-ssao-samples");
-    var parallaxInput = document.getElementById("enable-parallax");
-    var normalMappingInput = document.getElementById("enable-normal-mapping");
-    var diffuseTextureInput = document.getElementById("enable-diffuse-texture");
+    var inputNumGodRaySamples = document.getElementById("number-god-ray-samples");
+    var inputEnableGodRays = document.getElementById("enable-god-rays");
+    var inputNumSSAOSamples = document.getElementById("number-ssao-samples");
+    var inputEnableSSAO = document.getElementById("enable-ssao");
+    var inputEnableParallax = document.getElementById("enable-parallax");
+    var inputEnableNormalMap = document.getElementById("enable-normal-mapping");
+    var inputEnableDiffuse = document.getElementById("enable-diffuse-texture");
     
-    numGodRaySamplesInput.onchange = function() {
+    inputNumGodRaySamples.onchange = function() {
         shaders.deferred.fs = setDefined(shaders.deferred.fs, true,
                                          "NUM_CREPUSCULAR_SAMPLES",
-                                         numGodRaySamplesInput.value);
+                                         inputNumGodRaySamples.value);
+        shaders.deferred.program = reloadShader(shaders.deferred);
+    }
+    inputEnableGodRays.onchange = function() {
+        shaders.deferred.fs = setDefined(shaders.deferred.fs, inputEnableGodRays.checked, "CREPUSCULAR_RAYS");
         shaders.deferred.program = reloadShader(shaders.deferred);
     }
 
-    numSSAOSamplesInput.onchange = function() {
-        var value = numSSAOSamplesInput.value;
+    function setSSAO(enable) {
+        return setDefined(shaders.ssao.fs, enable, "ENABLE_SSAO");
+    }
+    inputNumSSAOSamples.onchange = function() {
+        var value = inputNumSSAOSamples.value;
         numSSAOSamples = value;
         if (value == null || value <= 0) {
-            shaders.ssao.fs = setDefined(shaders.ssao.fs, false, "ENABLE_SSAO");
+            shaders.ssao.fs = setSSAO(false);
         }
         else {
-            shaders.ssao.fs = setDefined(shaders.ssao.fs, true, "ENABLE_SSAO");
+            shaders.ssao.fs = setSSAO(inputEnableSSAO.checked);
             shaders.ssao.fs = setDefined(shaders.ssao.fs, true,
                                              "NUM_SSAO_SAMPLES",
                                              value);
         }
         shaders.ssao.program = reloadShader(shaders.ssao);
     }
-    
-    parallaxInput.onchange = function() {
-        shaders.pre.fs = setDefined(shaders.pre.fs, parallaxInput.checked, "PARALLAX_MAPPING");
+    inputEnableSSAO.onchange = function() {
+        shaders.ssao.fs = setSSAO(inputEnableSSAO.checked && inputNumSSAOSamples.value > 0);
+        shaders.ssao.program = reloadShader(shaders.ssao);
+    }
+
+    inputEnableParallax.onchange = function() {
+        shaders.pre.fs = setDefined(shaders.pre.fs, inputEnableParallax.checked, "PARALLAX_MAPPING");
         shaders.pre.program = reloadShader(shaders.pre);
     }
     
-    normalMappingInput.onchange = function() {
-        shaders.pre.fs = setDefined(shaders.pre.fs, normalMappingInput.checked, "NORMAL_MAPPING");
+    inputEnableNormalMap.onchange = function() {
+        shaders.pre.fs = setDefined(shaders.pre.fs, inputEnableNormalMap.checked, "NORMAL_MAPPING");
         shaders.pre.program = reloadShader(shaders.pre);
     }
     
-    diffuseTextureInput.onchange = function() {
-        shaders.pre.fs = setDefined(shaders.pre.fs, diffuseTextureInput.checked, "DIFFUSE_TEXTURE");
+    inputEnableDiffuse.onchange = function() {
+        shaders.pre.fs = setDefined(shaders.pre.fs, inputEnableDiffuse.checked, "DIFFUSE_TEXTURE");
         shaders.pre.program = reloadShader(shaders.pre);
     }
     </script>

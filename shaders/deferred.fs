@@ -21,6 +21,7 @@ float materialShininess = 8.0;
 const float EPS1 = 0.0;
 const float EPS2 = 0.25;
 
+#define CREPUSCULAR_RAYS
 #define NUM_CREPUSCULAR_SAMPLES 100
 
 vec3 calculateAmbient(vec3 ambientLight, vec3 materialAmbient) {
@@ -50,6 +51,7 @@ bool inShadow(samplerCube shadowMap, mat4 invModelViewMatrix, vec3 vectorFromLig
 void main(void) {
     vec4 normalDepth = texture2D(normalDepthTexture, texCoord);
     vec4 colorRGBA = texture2D(diffuseTexture, texCoord);
+    vec3 occlusion = texture2D(ssaoTexture, texCoord).rgb;
 
     float depth = normalDepth.a;
     float alpha = colorRGBA.a;
@@ -80,6 +82,7 @@ void main(void) {
     //vec3 emissive = materialEmissive;
 
     vec3 crepuscularRays = vec3(0);
+    #ifdef CREPUSCULAR_RAYS
     vec3 stepSize = viewSpacePosition / float(NUM_CREPUSCULAR_SAMPLES);
     vec3 intensity = crepuscularLight / float(NUM_CREPUSCULAR_SAMPLES);
     for (int i = 0; i < NUM_CREPUSCULAR_SAMPLES; i++) {
@@ -88,8 +91,7 @@ void main(void) {
             crepuscularRays += intensity;
         }
     }
-
-    vec3 occlusion = texture2D(ssaoTexture, texCoord).rgb;
+    #endif
 
     gl_FragColor = vec4(vec3(0)
     + ambient * vec3(occlusion)
