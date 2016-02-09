@@ -630,15 +630,15 @@ var hemisphereArray;
         var value = numSSAOSamplesInput.value;
         numSSAOSamples = value;
         if (value == null || value <= 0) {
-            shaders.deferred.fs = setDefined(shaders.deferred.fs, false, "ENABLE_SSAO");
+            shaders.ssao.fs = setDefined(shaders.ssao.fs, false, "ENABLE_SSAO");
         }
         else {
-            shaders.deferred.fs = setDefined(shaders.deferred.fs, true, "ENABLE_SSAO");
-            shaders.deferred.fs = setDefined(shaders.deferred.fs, true,
+            shaders.ssao.fs = setDefined(shaders.ssao.fs, true, "ENABLE_SSAO");
+            shaders.ssao.fs = setDefined(shaders.ssao.fs, true,
                                              "NUM_SSAO_SAMPLES",
                                              value);
         }
-        shaders.deferred.program = reloadShader(shaders.deferred);
+        shaders.ssao.program = reloadShader(shaders.ssao);
     }
     
     parallaxInput.onchange = function() {
