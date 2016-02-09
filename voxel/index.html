@@ -15,7 +15,8 @@
     var shaders = {
         pre       : { src : "shaders/pre" },
         deferred  : { src : "shaders/deferred" },
-        shadowmap : { src : "shaders/shadowmap" }
+        shadowmap : { src : "shaders/shadowmap" },
+        ssao      : { src : "shaders/ssao"}
     };
 
     // Render matrices
@@ -34,6 +35,7 @@
     var preFramebuffer;
     var shadowMapFramebuffer;
     var shadowMapFramebuffers;
+    var ssaoFramebuffer;
 
     var normalDepthTexture;
     var normalTexture;
@@ -41,6 +43,7 @@
     var cubeTexture;
     var depthTexture;
     var shadowMapTexture;
+    var ssaoTexture;
 
     var sceneFarPlane = 100;
     var shadowMapFarPlane = 100;
@@ -122,7 +125,12 @@
         shaders.deferred.program = initShader(
             shaders.deferred,
             ["position"],
-            ["normalDepthTexture", "diffuseTexture", "viewSpaceLightPos", "invProjectionMatrix", "shadowMap", "invModelViewMatrix", "noiseTexture", "hemisphere", "projectionMatrix"]
+            ["normalDepthTexture", "diffuseTexture", "viewSpaceLightPos", "invProjectionMatrix", "shadowMap", "invModelViewMatrix", "ssaoTexture"]
+        );
+        shaders.ssao.program = initShader(
+            shaders.ssao,
+            ["position"],
+            ["normalDepthTexture", "invProjectionMatrix", "projectionMatrix", "noiseTexture", "hemisphere"]
         );
     }
 
@@ -153,12 +161,9 @@
         gl.activeTexture(gl.TEXTURE2);
         gl.bindTexture(gl.TEXTURE_CUBE_MAP, shadowMapTexture);
         gl.uniform1i(p.uniforms["shadowMap"], 2);
-
         gl.activeTexture(gl.TEXTURE3);
-        gl.bindTexture(gl.TEXTURE_2D, noiseTexture);
-        gl.uniform1i(p.uniforms["noiseTexture"], 3);
-        gl.uniform3fv(p.uniforms["hemisphere"], hemisphereArray);
-        gl.uniformMatrix4fv(p.uniforms["projectionMatrix"], false, projectionMatrix);
+        gl.bindTexture(gl.TEXTURE_2D, ssaoTexture);
+        gl.uniform1i(p.uniforms["ssaoTexture"], 3);
         
         var invProjectionMatrix = mat4.create();
         mat4.inverse(projectionMatrix, invProjectionMatrix);
@@ -173,6 +178,23 @@
         var p = shaders.shadowmap.program;
         gl.uniformMatrix4fv(p.uniforms["projectionMatrix"], false, shadowMapProjectionMatrix);
         gl.uniformMatrix4fv(p.uniforms["modelViewMatrix"], false, shadowMapModelViewMatrices[face]);
+    }
+    function setSSAOUniforms() {
+        var p = shaders.ssao.program;
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, normalDepthTexture);
+        gl.uniform1i(p.uniforms["normalDepthTexture"], 0);
+        gl.activeTexture(gl.TEXTURE1);
+        gl.bindTexture(gl.TEXTURE_2D, noiseTexture);
+        gl.uniform1i(p.uniforms["noiseTexture"], 1);
+        
+        gl.uniform3fv(p.uniforms["hemisphere"], hemisphereArray);
+        gl.uniformMatrix4fv(p.uniforms["projectionMatrix"], false, projectionMatrix);
+        
+        var invProjectionMatrix = mat4.create();
+        mat4.inverse(projectionMatrix, invProjectionMatrix);
+        gl.uniformMatrix4fv(p.uniforms["invProjectionMatrix"], false, invProjectionMatrix);
+        gl.activeTexture(gl.TEXTURE0);
     }
 
     function initFramebuffers(width, height) {
@@ -287,6 +309,18 @@
             gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, shadowMapDepthBuffer);
         }
 
+        ssaoTexture = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, ssaoTexture);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+
+        ssaoFramebuffer = gl.createFramebuffer();
+        gl.bindFramebuffer(gl.FRAMEBUFFER, ssaoFramebuffer);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, ssaoTexture, 0);
+
         gl.bindTexture(gl.TEXTURE_2D, null);
         gl.bindRenderbuffer(gl.RENDERBUFFER, null);
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -348,7 +382,7 @@
         chunks.push(chunk);
     }
 
-    function drawScene() {
+    function drawPre() {
         gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
 
         mat4.perspective(45, gl.viewportWidth / gl.viewportHeight, 0.1, sceneFarPlane, projectionMatrix);
@@ -439,6 +473,14 @@ var hemisphereArray;
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
     }
 
+    function drawSSAO() {
+        gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, ssaoFramebuffer);
+        gl.useProgram(shaders.ssao.program);
+        setSSAOUniforms();
+        drawFullscreenQuad(shaders.ssao.program);
+    }
+
     function drawDeferred() {
         gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -448,8 +490,9 @@ var hemisphereArray;
     }
 
     function render() {
-        drawScene();
+        drawPre();
         drawShadowMap();
+        drawSSAO();
         drawDeferred();
     }
 
