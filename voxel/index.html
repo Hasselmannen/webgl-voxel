@@ -526,11 +526,11 @@
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
     }
 
-    function blur(origTexture) {
+    function blur(texture) {
         var p = shaders.blurH.program;
         gl.bindFramebuffer(gl.FRAMEBUFFER, blurHFramebuffer);
         gl.useProgram(p);
-        setBlurUniforms(p, ssaoTexture);
+        setBlurUniforms(p, texture);
         drawFullscreenQuad(p);
 
         p = shaders.blurV.program;
