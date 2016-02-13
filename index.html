@@ -399,7 +399,7 @@
             noiseArray = noiseArray.concat(noise);
         }
         noiseTexture = createTexture(
-            gl, texSize, texSize, gl.NEAREST, gl.REPEAT,
+            texSize, texSize, gl.NEAREST, gl.REPEAT,
             gl.RGB, gl.FLOAT, new Float32Array(noiseArray)
         );
     }
