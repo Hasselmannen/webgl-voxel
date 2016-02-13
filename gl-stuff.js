@@ -25,7 +25,7 @@ function initGL(canvas) {
     }
 }
 
-function linkProgram(gl, vsCode, fsCode) { 
+function linkProgram(vsCode, fsCode) { 
     var program = gl.createProgram();
     var vs = gl.createShader(gl.VERTEX_SHADER);
     var fs = gl.createShader(gl.FRAGMENT_SHADER);
@@ -57,7 +57,7 @@ function linkProgram(gl, vsCode, fsCode) {
     return program;
 }
 
-function createLoadTexture(gl, src, filtering, wrapping, mipmap, defaultColour) {
+function createLoadTexture(src, filtering, wrapping, mipmap, defaultColour) {
     var texture = createTexture(gl, 1, 1, filtering, wrapping, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(defaultColour))
     var image = new Image();
     image.addEventListener('load', function() { // Closure?
@@ -72,7 +72,7 @@ function createLoadTexture(gl, src, filtering, wrapping, mipmap, defaultColour) 
     return texture;
 }
 
-function createTexture(gl, width, height, filtering, wrapping, components, format, data) {
+function createTexture(width, height, filtering, wrapping, components, format, data) {
     var texture = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, texture);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filtering);
