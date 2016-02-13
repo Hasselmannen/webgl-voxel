@@ -14,7 +14,7 @@
 <script type="text/javascript">
     // Shaders
     var shaders = {
-        pre       : { src : "shaders/pre"       },
+        pre       : { src : "shaders/pre",      },
         deferred  : { src : "shaders/deferred"  },
         shadowmap : { src : "shaders/shadowmap" },
         ssao      : { src : "shaders/ssao"      },
@@ -35,26 +35,11 @@
 
     var chunks = new Array();
 
-    // Framebuffers
-    var preFramebuffer;
-    var shadowMapFramebuffer;
-    var shadowMapFramebuffers;
-    var ssaoFramebuffer;
-    var blurHFramebuffer;
-    var blurVFramebuffer;
-
     // Textures
-    var normalDepthTexture;
     var normalTexture;
-    var diffuseTexture;
     var cubeTexture;
-    var depthTexture;
-    var shadowMapTexture;
-    var ssaoTexture;
-    var ssaoBlurTexture;
+    var depthMap;
     var noiseTexture; // Noise for SSAO
-    var blurHTexture;
-    var blurVTexture;
 
     var sceneFarPlane = 100;
     var shadowMapFarPlane = 100;
@@ -177,17 +162,17 @@
     function setDeferredUniforms() {
         var p = shaders.deferred.program;
         gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_2D, normalDepthTexture);
+        gl.bindTexture(gl.TEXTURE_2D, shaders.pre.textureNormalDepth);
         gl.uniform1i(p.uniforms["normalDepthTexture"], 0);
         gl.activeTexture(gl.TEXTURE1);
-        gl.bindTexture(gl.TEXTURE_2D, diffuseTexture);
+        gl.bindTexture(gl.TEXTURE_2D, shaders.pre.textureDiffuse);
         gl.uniform1i(p.uniforms["diffuseTexture"], 1);
         gl.uniform3fv(p.uniforms["viewSpaceLightPos"], viewSpaceLightPos);
         gl.activeTexture(gl.TEXTURE2);
-        gl.bindTexture(gl.TEXTURE_CUBE_MAP, shadowMapTexture);
+        gl.bindTexture(gl.TEXTURE_CUBE_MAP, shaders.shadowmap.texture);
         gl.uniform1i(p.uniforms["shadowMap"], 2);
         gl.activeTexture(gl.TEXTURE3);
-        gl.bindTexture(gl.TEXTURE_2D, ssaoBlurTexture);
+        gl.bindTexture(gl.TEXTURE_2D, shaders.ssao.textureBlurred);
         gl.uniform1i(p.uniforms["ssaoTexture"], 3);
 
         var invProjectionMatrix = mat4.create();
@@ -207,7 +192,7 @@
     function setSSAOUniforms() {
         var p = shaders.ssao.program;
         gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_2D, normalDepthTexture);
+        gl.bindTexture(gl.TEXTURE_2D, shaders.pre.textureNormalDepth);
         gl.uniform1i(p.uniforms["normalDepthTexture"], 0);
         gl.activeTexture(gl.TEXTURE1);
         gl.bindTexture(gl.TEXTURE_2D, noiseTexture);
@@ -239,27 +224,27 @@
             console.log("no depth textures");
         }
 
-        diffuseTexture     = createTexture(gl, width, height, gl.LINEAR,  gl.CLAMP_TO_EDGE, gl.RGBA, gl.FLOAT);
-        normalDepthTexture = createTexture(gl, width, height, gl.NEAREST, gl.CLAMP_TO_EDGE, gl.RGBA, gl.FLOAT);
-        depthTexture       = createTexture(gl, width, height, gl.NEAREST, gl.CLAMP_TO_EDGE, gl.DEPTH_COMPONENT, gl.UNSIGNED_SHORT);
+        shaders.pre.textureDiffuse     = createTexture(gl, width, height, gl.LINEAR,  gl.CLAMP_TO_EDGE, gl.RGBA, gl.FLOAT);
+        shaders.pre.textureNormalDepth = createTexture(gl, width, height, gl.NEAREST, gl.CLAMP_TO_EDGE, gl.RGBA, gl.FLOAT);
+        shaders.pre.textureDepth       = createTexture(gl, width, height, gl.NEAREST, gl.CLAMP_TO_EDGE, gl.DEPTH_COMPONENT, gl.UNSIGNED_SHORT);
 
         // PRE FRAMEBUFFER
-        preFramebuffer = gl.createFramebuffer();
-        gl.bindFramebuffer(gl.FRAMEBUFFER, preFramebuffer);
-        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, depthTexture, 0);
-        gl.framebufferTexture2D(gl.FRAMEBUFFER, mrtExt.COLOR_ATTACHMENT0_WEBGL, gl.TEXTURE_2D, diffuseTexture, 0);
-        gl.framebufferTexture2D(gl.FRAMEBUFFER, mrtExt.COLOR_ATTACHMENT1_WEBGL, gl.TEXTURE_2D, normalDepthTexture, 0);
+        shaders.pre.framebuffer = gl.createFramebuffer();
+        gl.bindFramebuffer(gl.FRAMEBUFFER, shaders.pre.framebuffer);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, shaders.pre.textureDepth, 0);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, mrtExt.COLOR_ATTACHMENT0_WEBGL, gl.TEXTURE_2D, shaders.pre.textureDiffuse, 0);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, mrtExt.COLOR_ATTACHMENT1_WEBGL, gl.TEXTURE_2D, shaders.pre.textureNormalDepth, 0);
 
         mrtExt.drawBuffersWEBGL([
             mrtExt.COLOR_ATTACHMENT0_WEBGL,
             mrtExt.COLOR_ATTACHMENT1_WEBGL
         ]);
 
-        shadowMapFramebuffer = gl.createFramebuffer();
-        gl.bindFramebuffer(gl.FRAMEBUFFER, shadowMapFramebuffer);
+        shaders.shadowmap.framebuffer = gl.createFramebuffer();
+        gl.bindFramebuffer(gl.FRAMEBUFFER, shaders.shadowmap.framebuffer);
         // SHADOW MAP STUFF
-        shadowMapTexture = gl.createTexture();
-        gl.bindTexture(gl.TEXTURE_CUBE_MAP, shadowMapTexture);
+        shaders.shadowmap.texture = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_CUBE_MAP, shaders.shadowmap.texture);
         gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
         gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
         gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
@@ -273,34 +258,34 @@
         gl.bindRenderbuffer(gl.RENDERBUFFER, shadowMapDepthBuffer);
         gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, shadowMapSize, shadowMapSize);
 
-        shadowMapFramebuffers = new Array(6);
+        shaders.shadowmap.framebuffers = new Array(6);
         for (var i = 0; i < 6; i++) {
             // Different framebuffers for every face, it is much faster:
             // http://jsperf.com/webgl-cubemap-fbo-change-face-test
-            shadowMapFramebuffers[i] = gl.createFramebuffer();
-            gl.bindFramebuffer(gl.FRAMEBUFFER, shadowMapFramebuffers[i]);
-            gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_CUBE_MAP_POSITIVE_X + i, shadowMapTexture, 0);
+            shaders.shadowmap.framebuffers[i] = gl.createFramebuffer();
+            gl.bindFramebuffer(gl.FRAMEBUFFER, shaders.shadowmap.framebuffers[i]);
+            gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_CUBE_MAP_POSITIVE_X + i, shaders.shadowmap.texture, 0);
 
             gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, shadowMapDepthBuffer);
         }
 
-        ssaoTexture = createTexture(gl, width, height, gl.NEAREST, gl.CLAMP_TO_EDGE, gl.RGBA, gl.UNSIGNED_BYTE);
+        shaders.ssao.texture = createTexture(gl, width, height, gl.NEAREST, gl.CLAMP_TO_EDGE, gl.RGBA, gl.UNSIGNED_BYTE);
 
-        ssaoFramebuffer = gl.createFramebuffer();
-        gl.bindFramebuffer(gl.FRAMEBUFFER, ssaoFramebuffer);
-        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, ssaoTexture, 0);
+        shaders.ssao.framebuffer = gl.createFramebuffer();
+        gl.bindFramebuffer(gl.FRAMEBUFFER, shaders.ssao.framebuffer);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, shaders.ssao.texture, 0);
 
-        blurHTexture = createTexture(gl, width, height, gl.NEAREST, gl.CLAMP_TO_EDGE, gl.RGBA, gl.UNSIGNED_BYTE);
+        shaders.blurH.texture = createTexture(gl, width, height, gl.NEAREST, gl.CLAMP_TO_EDGE, gl.RGBA, gl.UNSIGNED_BYTE);
 
-        blurHFramebuffer = gl.createFramebuffer();
-        gl.bindFramebuffer(gl.FRAMEBUFFER, blurHFramebuffer);
-        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, blurHTexture, 0);
+        shaders.blurH.framebuffer = gl.createFramebuffer();
+        gl.bindFramebuffer(gl.FRAMEBUFFER, shaders.blurH.framebuffer);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, shaders.blurH.texture, 0);
 
-        blurVTexture = createTexture(gl, width, height, gl.NEAREST, gl.CLAMP_TO_EDGE, gl.RGBA, gl.UNSIGNED_BYTE);
+        shaders.blurV.texture = createTexture(gl, width, height, gl.NEAREST, gl.CLAMP_TO_EDGE, gl.RGBA, gl.UNSIGNED_BYTE);
 
-        blurVFramebuffer = gl.createFramebuffer();
-        gl.bindFramebuffer(gl.FRAMEBUFFER, blurVFramebuffer);
-        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, blurVTexture, 0);
+        shaders.blurV.framebuffer = gl.createFramebuffer();
+        gl.bindFramebuffer(gl.FRAMEBUFFER, shaders.blurV.framebuffer);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, shaders.blurV.texture, 0);
 
         gl.bindTexture(gl.TEXTURE_2D, null);
         gl.bindRenderbuffer(gl.RENDERBUFFER, null);
@@ -372,7 +357,7 @@
 
         mat4.multiplyVec3(modelViewMatrix, lightPos, viewSpaceLightPos);
 
-        gl.bindFramebuffer(gl.FRAMEBUFFER, preFramebuffer);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, shaders.pre.framebuffer);
         gl.enable(gl.DEPTH_TEST);
         gl.clearColor(0, 0, 0, 100.0);
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
@@ -402,7 +387,7 @@
         gl.clearColor(shadowMapFarPlane, shadowMapFarPlane, shadowMapFarPlane, shadowMapFarPlane);
         gl.viewport(0, 0, shadowMapSize, shadowMapSize);
         for (var i = 0; i < 6; i++) {
-            gl.bindFramebuffer(gl.FRAMEBUFFER, shadowMapFramebuffers[i]);
+            gl.bindFramebuffer(gl.FRAMEBUFFER, shaders.shadowmap.framebuffers[i]);
             gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
             gl.enable(gl.DEPTH_TEST);
 
@@ -453,28 +438,28 @@
 
     function blur(texture) {
         var p = shaders.blurH.program;
-        gl.bindFramebuffer(gl.FRAMEBUFFER, blurHFramebuffer);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, shaders.blurH.framebuffer);
         gl.useProgram(p);
         setBlurUniforms(p, texture);
         drawFullscreenQuad(p);
 
         p = shaders.blurV.program;
-        gl.bindFramebuffer(gl.FRAMEBUFFER, blurVFramebuffer);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, shaders.blurV.framebuffer);
         gl.useProgram(p);
-        setBlurUniforms(p, blurHTexture);
+        setBlurUniforms(p, shaders.blurH.texture);
         drawFullscreenQuad(p);
 
-        return blurVTexture;
+        return shaders.blurV.texture;
     }
 
     function drawSSAO() {
         gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
-        gl.bindFramebuffer(gl.FRAMEBUFFER, ssaoFramebuffer);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, shaders.ssao.framebuffer);
         gl.useProgram(shaders.ssao.program);
         setSSAOUniforms();
         drawFullscreenQuad(shaders.ssao.program);
 
-        ssaoBlurTexture = blur(ssaoTexture);
+        shaders.ssao.textureBlurred = blur(shaders.ssao.texture);
     }
 
     function drawDeferred() {
