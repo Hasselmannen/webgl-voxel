@@ -59,3 +59,29 @@ function getShader(gl, id) {
 
     return shader;
 }
+
+function createLoadTexture(gl, src, filtering, wrapping, mipmap, defaultColour) {
+    var texture = createTexture(gl, 1, 1, filtering, wrapping, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(defaultColour))
+    var image = new Image();
+    image.addEventListener('load', function() { // Closure?
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+        if (mipmap) {
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, mipmap ? gl.LINEAR_MIPMAP_LINEAR : filtering);
+            gl.generateMipmap(gl.TEXTURE_2D);
+        }
+    });
+    image.src = src;
+    return texture;
+}
+
+function createTexture(gl, width, height, filtering, wrapping, components, format, data) {
+    var texture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filtering);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filtering);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrapping);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrapping);
+    gl.texImage2D(gl.TEXTURE_2D, 0, components, width, height, 0, components, format, data);
+    return texture;
+}
