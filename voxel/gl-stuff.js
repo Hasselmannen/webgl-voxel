@@ -58,7 +58,7 @@ function linkProgram(vsCode, fsCode) {
 }
 
 function createLoadTexture(src, filtering, wrapping, mipmap, defaultColour) {
-    var texture = createTexture(gl, 1, 1, filtering, wrapping, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(defaultColour))
+    var texture = createTexture(1, 1, filtering, wrapping, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(defaultColour))
     var image = new Image();
     image.addEventListener('load', function() { // Closure?
         gl.bindTexture(gl.TEXTURE_2D, texture);
