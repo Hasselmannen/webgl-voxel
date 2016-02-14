@@ -95,7 +95,6 @@ frameTimeStats.prototype.addSample = function(sampleInMillis) {
         ", Max: " + max.toFixed(1);
 }
 
-
 // Renderer information
 function rendererInfo(outputElement) {
     this._output = outputElement;

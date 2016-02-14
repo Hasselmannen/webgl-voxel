@@ -35,9 +35,7 @@ inputNumSSAOSamples.onchange = function() {
     }
     else {
         shaders.ssao.fs = setSSAO(inputEnableSSAO.checked);
-        shaders.ssao.fs = setDefined(shaders.ssao.fs, true,
-                                         "NUM_SSAO_SAMPLES",
-                                         value);
+        shaders.ssao.fs = setDefined(shaders.ssao.fs, true, "NUM_SSAO_SAMPLES", value);
     }
     shaders.ssao.program = reloadShader(shaders.ssao);
 }
