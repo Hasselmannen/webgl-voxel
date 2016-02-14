@@ -1,6 +1,5 @@
 var gl;
-var ext;
-var mrtExt;
+var ext = new Object();
 function initGL(canvas) {
     try {
         gl = canvas.getContext("experimental-webgl");
@@ -11,18 +10,23 @@ function initGL(canvas) {
     if (!gl) {
         alert("Could not initialize WebGL!");
     }
-    mrtExt = gl.getExtension('WEBGL_draw_buffers');
-    if (!mrtExt) {
+    ext.mrt = gl.getExtension('WEBGL_draw_buffers');
+    if (!ext.mrt) {
         alert("Could not initialize WEBGL_draw_buffers!");
     }
-    ext = gl.getExtension("OES_texture_float");
-    if (!ext) {
+    ext.floatTex = gl.getExtension("OES_texture_float");
+    if (!ext.floatTex) {
         alert("no OES_texture_float");
     }
-    ext = gl.getExtension("OES_texture_float_linear");
-    if (!ext) {
+    ext.linearFloatTex = gl.getExtension("OES_texture_float_linear");
+    if (!ext.linearFloatTex) {
         alert("no OES_texture_float_linear");
     }
+    ext.depthTex = gl.getExtension("WEBGL_depth_texture");
+    if (!ext.depthTex) {
+        console.log("no depth textures");
+    }
+
 }
 
 function linkProgram(vsCode, fsCode) { 
@@ -81,4 +85,63 @@ function createTexture(width, height, filtering, wrapping, components, format, d
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrapping);
     gl.texImage2D(gl.TEXTURE_2D, 0, components, width, height, 0, components, format, data);
     return texture;
+}
+
+function createCubeMapFramebuffers(texture, width, height) {
+// Different framebuffers for every face, it is much faster:
+// http://jsperf.com/webgl-cubemap-fbo-change-face-test
+    var framebuffers = new Array(6);
+    var depthBuffer = gl.createRenderbuffer();
+    
+    gl.bindRenderbuffer(gl.RENDERBUFFER, depthBuffer);
+    gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, width, height);
+
+    for (var i = 0; i < 6; i++) {
+        framebuffers[i] = gl.createFramebuffer();
+        gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffers[i]);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_CUBE_MAP_POSITIVE_X + i, texture, 0);
+
+        gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, depthBuffer);
+    }
+
+    return framebuffers;
+}
+
+function createCubeMapTexture(width, height, filtering, wrapping, components, format) {
+    var texture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_CUBE_MAP, texture);
+    gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MAG_FILTER, filtering);
+    gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MIN_FILTER, filtering);
+    gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_S, wrapping);
+    gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_T, wrapping);
+
+    for (var i = 0; i < 6; i++) {
+        gl.texImage2D(gl.TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, components, width, height, 0, components, format, null);
+    }
+
+    return texture;
+}
+
+function createFramebuffer(texture) {
+    var framebuffer = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
+    return framebuffer;
+}
+
+function createMrtFramebuffer(textures, depthTexture) {
+    var framebuffer = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+
+    if (depthTexture != null) {
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, depthTexture, 0);
+    }
+    var attachments = new Array(textures.length);
+    for (var i = 0; i < textures.length; i++) {
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, ext.mrt.COLOR_ATTACHMENT0_WEBGL+i, gl.TEXTURE_2D, textures[i], 0);
+        attachments[i] = ext.mrt.COLOR_ATTACHMENT0_WEBGL + i;
+    }
+    ext.mrt.drawBuffersWEBGL(attachments);
+
+    return framebuffer;
 }
