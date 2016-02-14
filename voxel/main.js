@@ -9,9 +9,10 @@ var shaders = {
 };
 
 // Render matrices
-var modelViewMatrix = mat4.create();
-var projectionMatrix = mat4.create();
+var modelViewMatrix           = mat4.create();
+var projectionMatrix          = mat4.create();
 var shadowMapProjectionMatrix = mat4.create();
+
 var shadowMapModelViewMatrices = new Array();
 
 var lightPos = [8, 8, 8];
@@ -249,9 +250,9 @@ function setupScene() {
 
     for (var i = 0; i < Chunk.SIZE; i++) {
         for (var j = 0; j < Chunk.SIZE; j++) {
-            chunk.SetActive(i, 6, j, true); // Floor
+            chunk.SetActive(i,  6, j, true); // Floor
             chunk.SetActive(i, 10, j, true); // Ceiling
-            chunk.SetActive(i, j, 6, true); // Far wall
+            chunk.SetActive(i,  j, 6, true); // Far wall
         }
     }
     chunk.CreateMesh();
