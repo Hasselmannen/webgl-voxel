@@ -468,5 +468,4 @@ function loadShaders(callback) {
         });
     }
 }
-
 init();
