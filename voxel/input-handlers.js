@@ -6,12 +6,12 @@ function setDefined(text, define, string, value) {
 }
 
 var inputNumGodRaySamples = document.getElementById("number-god-ray-samples");
-var inputEnableGodRays = document.getElementById("enable-god-rays");
-var inputNumSSAOSamples = document.getElementById("number-ssao-samples");
-var inputEnableSSAO = document.getElementById("enable-ssao");
-var inputEnableParallax = document.getElementById("enable-parallax");
-var inputEnableNormalMap = document.getElementById("enable-normal-mapping");
-var inputEnableDiffuse = document.getElementById("enable-diffuse-texture");
+var inputEnableGodRays    = document.getElementById("enable-god-rays"       );
+var inputNumSSAOSamples   = document.getElementById("number-ssao-samples"   );
+var inputEnableSSAO       = document.getElementById("enable-ssao"           );
+var inputEnableParallax   = document.getElementById("enable-parallax"       );
+var inputEnableNormalMap  = document.getElementById("enable-normal-mapping" );
+var inputEnableDiffuse    = document.getElementById("enable-diffuse-texture");
 
 inputNumGodRaySamples.onchange = function() {
     shaders.deferred.fs = setDefined(shaders.deferred.fs, true,
