@@ -189,11 +189,10 @@
         cubeTexture   = createLoadTexture(cubeTextureData.data,      gl.LINEAR, gl.CLAMP_TO_EDGE, true, [0, 0, 255, 255]);
         depthMap      = createLoadTexture(cubeTextureData.depthMap,  gl.LINEAR, gl.CLAMP_TO_EDGE, true, [0, 0, 255, 255]);
 
+        // PRE SHADER
         shaders.pre.textureDiffuse     = createTexture(width, height, gl.LINEAR,  gl.CLAMP_TO_EDGE, gl.RGBA, gl.FLOAT);
         shaders.pre.textureNormalDepth = createTexture(width, height, gl.NEAREST, gl.CLAMP_TO_EDGE, gl.RGBA, gl.FLOAT);
         shaders.pre.textureDepth       = createTexture(width, height, gl.NEAREST, gl.CLAMP_TO_EDGE, gl.DEPTH_COMPONENT, gl.UNSIGNED_SHORT);
-
-        // PRE FRAMEBUFFER
         shaders.pre.framebuffer = createMrtFramebuffer([shaders.pre.textureDiffuse,
                                                         shaders.pre.textureNormalDepth],
                                                         shaders.pre.textureDepth);
@@ -202,13 +201,14 @@
         shaders.shadowmap.texture = createCubeMapTexture(shadowMapSize, shadowMapSize, gl.NEAREST, gl.CLAMP_TO_EDGE, gl.RGBA, gl.FLOAT);
         shaders.shadowmap.framebuffers = createCubeMapFramebuffers(shaders.shadowmap.texture, shadowMapSize, shadowMapSize);
 
+        // SSAO
         shaders.ssao.texture = createTexture(width, height, gl.NEAREST, gl.CLAMP_TO_EDGE, gl.RGBA, gl.UNSIGNED_BYTE);
         shaders.ssao.framebuffer = createFramebuffer(shaders.ssao.texture);
 
+        // BLUR
         shaders.blurH.texture = createTexture(width, height, gl.NEAREST, gl.CLAMP_TO_EDGE, gl.RGBA, gl.UNSIGNED_BYTE);
-        shaders.blurV.texture = createTexture(width, height, gl.NEAREST, gl.CLAMP_TO_EDGE, gl.RGBA, gl.UNSIGNED_BYTE);
-
         shaders.blurH.framebuffer = createFramebuffer(shaders.blurH.texture);
+        shaders.blurV.texture = createTexture(width, height, gl.NEAREST, gl.CLAMP_TO_EDGE, gl.RGBA, gl.UNSIGNED_BYTE);
         shaders.blurV.framebuffer = createFramebuffer(shaders.blurV.texture);
 
         gl.bindTexture(gl.TEXTURE_2D, null);
@@ -290,12 +290,12 @@
         setPreUniforms();
 
         for (var i = 0; i < chunks.length; i++) {
-            chunks[i].SetPositions(shaders.pre.program);
-            chunks[i].SetNormals(shaders.pre.program);
-            chunks[i].SetTangents(shaders.pre.program);
+            chunks[i].SetPositions (shaders.pre.program);
+            chunks[i].SetNormals   (shaders.pre.program);
+            chunks[i].SetTangents  (shaders.pre.program);
             chunks[i].SetBitangents(shaders.pre.program);
-            chunks[i].SetTexCoords(shaders.pre.program);
-            chunks[i].Render(shaders.pre.program);
+            chunks[i].SetTexCoords (shaders.pre.program);
+            chunks[i].Render       (shaders.pre.program);
         }
     }
 
