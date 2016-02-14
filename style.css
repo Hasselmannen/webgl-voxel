@@ -1,8 +1,11 @@
+body {
+    font-family: "droid sans mono", monospace;
+}
 #canvas {
     border: none;
 }
 .input-enable {
     display: inline-block;
-    width: 120px;
+    width: 200px;
     text-align: right;
 }
