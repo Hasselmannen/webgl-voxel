@@ -99,36 +99,41 @@ function initShaders() {
     );
 }
 
+// p is the program, textures is an array of textures
+// to bind of the format [["texName", texVar, gl.TEX_TYPE]]
+function setTextureUniforms(p, textures) {
+    textures.forEach(function(e, i) {
+        gl.activeTexture(gl.TEXTURE0 + i);
+        gl.bindTexture(e[2], e[1]);
+        gl.uniform1i(p.uniforms[e[0]], i);
+    });
+    gl.activeTexture(gl.TEXTURE0);
+}
+
 function setPreUniforms() {
     var p = shaders.pre.program;
     gl.uniformMatrix4fv(p.uniforms["projectionMatrix"], false, projectionMatrix);
     gl.uniformMatrix4fv(p.uniforms["modelViewMatrix"], false, modelViewMatrix);
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, cubeTexture);
-    gl.uniform1i(p.uniforms["diffuseTexture"], 0);
-    gl.activeTexture(gl.TEXTURE1);
-    gl.bindTexture(gl.TEXTURE_2D, normalTexture);
-    gl.uniform1i(p.uniforms["normalTexture"], 1);
-    gl.activeTexture(gl.TEXTURE2);
-    gl.bindTexture(gl.TEXTURE_2D, depthMap);
-    gl.uniform1i(p.uniforms["depthMap"], 2);
-    gl.activeTexture(gl.TEXTURE0);
+
+    var textures = [
+        ["diffuseTexture", cubeTexture,   gl.TEXTURE_2D],
+        ["normalTexture",  normalTexture, gl.TEXTURE_2D],
+        ["depthMap",       depthMap,      gl.TEXTURE_2D]
+    ];
+    setTextureUniforms(p, textures);
 }
 function setDeferredUniforms() {
     var p = shaders.deferred.program;
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, shaders.pre.textureNormalDepth);
-    gl.uniform1i(p.uniforms["normalDepthTexture"], 0);
-    gl.activeTexture(gl.TEXTURE1);
-    gl.bindTexture(gl.TEXTURE_2D, shaders.pre.textureDiffuse);
-    gl.uniform1i(p.uniforms["diffuseTexture"], 1);
+
+    var textures = [
+        ["normalDepthTexture", shaders.pre.textureNormalDepth, gl.TEXTURE_2D],
+        ["diffuseTexture",     shaders.pre.textureDiffuse,     gl.TEXTURE_2D],
+        ["shadowMap",          shaders.shadowmap.texture,      gl.TEXTURE_CUBE_MAP],
+        ["ssaoTexture",        shaders.ssao.textureBlurred,    gl.TEXTURE_2D]
+    ];
+    setTextureUniforms(p, textures);
+
     gl.uniform3fv(p.uniforms["viewSpaceLightPos"], viewSpaceLightPos);
-    gl.activeTexture(gl.TEXTURE2);
-    gl.bindTexture(gl.TEXTURE_CUBE_MAP, shaders.shadowmap.texture);
-    gl.uniform1i(p.uniforms["shadowMap"], 2);
-    gl.activeTexture(gl.TEXTURE3);
-    gl.bindTexture(gl.TEXTURE_2D, shaders.ssao.textureBlurred);
-    gl.uniform1i(p.uniforms["ssaoTexture"], 3);
 
     var invProjectionMatrix = mat4.create();
     mat4.inverse(projectionMatrix, invProjectionMatrix);
@@ -142,16 +147,16 @@ function setDeferredUniforms() {
 function setShadowMapUniforms(face) {
     var p = shaders.shadowmap.program;
     gl.uniformMatrix4fv(p.uniforms["projectionMatrix"], false, shadowMapProjectionMatrix);
-    gl.uniformMatrix4fv(p.uniforms["modelViewMatrix"], false, shadowMapModelViewMatrices[face]);
+    gl.uniformMatrix4fv(p.uniforms["modelViewMatrix"],  false, shadowMapModelViewMatrices[face]);
 }
 function setSSAOUniforms() {
     var p = shaders.ssao.program;
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, shaders.pre.textureNormalDepth);
-    gl.uniform1i(p.uniforms["normalDepthTexture"], 0);
-    gl.activeTexture(gl.TEXTURE1);
-    gl.bindTexture(gl.TEXTURE_2D, noiseTexture);
-    gl.uniform1i(p.uniforms["noiseTexture"], 1);
+
+    var textures = [
+        ["normalDepthTexture", shaders.pre.textureNormalDepth, gl.TEXTURE_2D],
+        ["noiseTexture",       noiseTexture,                   gl.TEXTURE_2D]
+    ];
+    setTextureUniforms(p, textures);
 
     gl.uniform3fv(p.uniforms["hemisphere"], hemisphereArray);
     gl.uniformMatrix4fv(p.uniforms["projectionMatrix"], false, projectionMatrix);
@@ -163,15 +168,13 @@ function setSSAOUniforms() {
 }
 // p should be the program with which to blur (i.e. shaders.blurH.program or shaders.blurV.program)
 function setBlurUniforms(p, texture, sampleResX, sampleResY) {
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, texture);
-    gl.uniform1i(p.uniforms["texture"], 0);
+    setTextureUniforms(p, [["texture", texture, gl.TEXTURE_2D]]);
     gl.uniform1f(p.uniforms["sampleResX"], sampleResX);
     gl.uniform1f(p.uniforms["sampleResY"], sampleResY);
 }
 
 function initFramebuffers(width, height) {
-    
+
     normalTexture = createLoadTexture(cubeTextureData.normalMap, gl.LINEAR, gl.CLAMP_TO_EDGE, true, [0, 0, 255, 255]);
     cubeTexture   = createLoadTexture(cubeTextureData.data,      gl.LINEAR, gl.CLAMP_TO_EDGE, true, [0, 0, 255, 255]);
     depthMap      = createLoadTexture(cubeTextureData.depthMap,  gl.LINEAR, gl.CLAMP_TO_EDGE, true, [0, 0, 255, 255]);
@@ -194,8 +197,8 @@ function initFramebuffers(width, height) {
 
     // BLUR
     shaders.blurH.texture = createTexture(width, height, gl.NEAREST, gl.CLAMP_TO_EDGE, gl.RGBA, gl.UNSIGNED_BYTE);
-    shaders.blurH.framebuffer = createFramebuffer(shaders.blurH.texture);
     shaders.blurV.texture = createTexture(width, height, gl.NEAREST, gl.CLAMP_TO_EDGE, gl.RGBA, gl.UNSIGNED_BYTE);
+    shaders.blurH.framebuffer = createFramebuffer(shaders.blurH.texture);
     shaders.blurV.framebuffer = createFramebuffer(shaders.blurV.texture);
 
     gl.bindTexture(gl.TEXTURE_2D, null);
