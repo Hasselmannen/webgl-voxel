@@ -12,6 +12,7 @@ var inputEnableSSAO       = document.getElementById("enable-ssao"           );
 var inputEnableParallax   = document.getElementById("enable-parallax"       );
 var inputEnableNormalMap  = document.getElementById("enable-normal-mapping" );
 var inputEnableDiffuse    = document.getElementById("enable-diffuse-texture");
+var inputGodRayIntensity  = document.getElementById("god-ray-intensity"     );
 
 inputNumGodRaySamples.onchange = function() {
     shaders.deferred.fs = setDefined(shaders.deferred.fs, true,
@@ -22,6 +23,9 @@ inputNumGodRaySamples.onchange = function() {
 inputEnableGodRays.onchange = function() {
     shaders.deferred.fs = setDefined(shaders.deferred.fs, inputEnableGodRays.checked, "CREPUSCULAR_RAYS");
     shaders.deferred.program = reloadShader(shaders.deferred);
+}
+inputGodRayIntensity.onchange = function() {
+    godRayIntensity = inputGodRayIntensity.value;
 }
 
 function setSSAO(enable) {

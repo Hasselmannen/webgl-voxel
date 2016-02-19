@@ -29,7 +29,7 @@ function initGL(canvas) {
 
 }
 
-function linkProgram(vsCode, fsCode) { 
+function linkProgram(vsCode, fsCode) {
     var program = gl.createProgram();
     var vs = gl.createShader(gl.VERTEX_SHADER);
     var fs = gl.createShader(gl.FRAGMENT_SHADER);
@@ -92,7 +92,7 @@ function createCubeMapFramebuffers(texture, width, height) {
 // http://jsperf.com/webgl-cubemap-fbo-change-face-test
     var framebuffers = new Array(6);
     var depthBuffer = gl.createRenderbuffer();
-    
+
     gl.bindRenderbuffer(gl.RENDERBUFFER, depthBuffer);
     gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, width, height);
 
@@ -138,7 +138,7 @@ function createMrtFramebuffer(textures, depthTexture) {
     }
     var attachments = new Array(textures.length);
     for (var i = 0; i < textures.length; i++) {
-        gl.framebufferTexture2D(gl.FRAMEBUFFER, ext.mrt.COLOR_ATTACHMENT0_WEBGL+i, gl.TEXTURE_2D, textures[i], 0);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, ext.mrt.COLOR_ATTACHMENT0_WEBGL + i, gl.TEXTURE_2D, textures[i], 0);
         attachments[i] = ext.mrt.COLOR_ATTACHMENT0_WEBGL + i;
     }
     ext.mrt.drawBuffersWEBGL(attachments);
