@@ -3,6 +3,8 @@ precision highp float;
 varying vec2 texCoord;
 varying vec3 farPlaneRay;
 
+uniform float godRayIntensity;
+
 uniform vec3 viewSpaceLightPos;
 uniform mat4 invModelViewMatrix;
 
@@ -87,10 +89,12 @@ void main(void) {
     vec3 intensity = crepuscularLight / float(NUM_CREPUSCULAR_SAMPLES);
     for (int i = 0; i < NUM_CREPUSCULAR_SAMPLES; i++) {
         vec3 pos = stepSize * float(i);
-        if (!inShadow(shadowMap, invModelViewMatrix, pos - viewSpaceLightPos, EPS1, EPS2)) {
-            crepuscularRays += intensity;
+        vec3 lightToPos = pos - viewSpaceLightPos;
+        if (!inShadow(shadowMap, invModelViewMatrix, lightToPos, EPS1, EPS2)) {
+            crepuscularRays += intensity / sqrt(length(lightToPos));
         }
     }
+    crepuscularRays *= length(stepSize) * godRayIntensity;
     #endif
 
     gl_FragColor = vec4(vec3(0)

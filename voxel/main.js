@@ -18,6 +18,8 @@ var shadowMapModelViewMatrices = new Array();
 var lightPos = [8, 8, 8];
 var viewSpaceLightPos = new Array();
 
+var godRayIntensity = 15;
+
 var camera = new Camera([8, 8, 19], [0, 0, -1]);
 
 var chunks = new Array();
@@ -80,7 +82,7 @@ function initShaders() {
     shaders.deferred.program = initShader(
         shaders.deferred,
         ["position"],
-        ["normalDepthTexture", "diffuseTexture", "viewSpaceLightPos", "invProjectionMatrix", "shadowMap", "invModelViewMatrix", "ssaoTexture"]
+        ["normalDepthTexture", "diffuseTexture", "viewSpaceLightPos", "invProjectionMatrix", "shadowMap", "invModelViewMatrix", "ssaoTexture", "godRayIntensity"]
     );
     shaders.ssao.program = initShader(
         shaders.ssao,
@@ -143,6 +145,8 @@ function setDeferredUniforms() {
     var invModelViewMatrix = mat4.create();
     mat4.inverse(modelViewMatrix, invModelViewMatrix);
     gl.uniformMatrix4fv(p.uniforms["invModelViewMatrix"], false, invModelViewMatrix);
+
+    gl.uniform1f(p.uniforms["godRayIntensity"], godRayIntensity);
 }
 function setShadowMapUniforms(face) {
     var p = shaders.shadowmap.program;
