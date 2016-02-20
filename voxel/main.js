@@ -4,8 +4,7 @@ var shaders = {
     deferred  : { src : "shaders/deferred"  },
     shadowmap : { src : "shaders/shadowmap" },
     ssao      : { src : "shaders/ssao"      },
-    blurH     : { src : "shaders/blur-h"    },
-    blurV     : { src : "shaders/blur-v"    }
+    blur      : { src : "shaders/blur"      }
 };
 
 // Render matrices
@@ -89,15 +88,10 @@ function initShaders() {
         ["position"],
         ["normalDepthTexture", "invProjectionMatrix", "projectionMatrix", "noiseTexture", "hemisphere"]
     );
-    shaders.blurH.program = initShader(
-        shaders.blurH,
+    shaders.blur.program = initShader(
+        shaders.blur,
         ["position"],
-        ["texture", "sampleResX"]
-    );
-    shaders.blurV.program = initShader(
-        shaders.blurV,
-        ["position"],
-        ["texture", "sampleResY"]
+        ["texture", "sampleStep"]
     );
 }
 
@@ -171,10 +165,9 @@ function setSSAOUniforms() {
     gl.activeTexture(gl.TEXTURE0);
 }
 // p should be the program with which to blur (i.e. shaders.blurH.program or shaders.blurV.program)
-function setBlurUniforms(p, texture, sampleResX, sampleResY) {
+function setBlurUniforms(p, texture, sampleStep) {
     setTextureUniforms(p, [["texture", texture, gl.TEXTURE_2D]]);
-    gl.uniform1f(p.uniforms["sampleResX"], sampleResX);
-    gl.uniform1f(p.uniforms["sampleResY"], sampleResY);
+    gl.uniform2fv(p.uniforms["sampleStep"], sampleStep);
 }
 
 function initFramebuffers(width, height) {
@@ -200,10 +193,10 @@ function initFramebuffers(width, height) {
     shaders.ssao.framebuffer = createFramebuffer(shaders.ssao.texture);
 
     // BLUR
-    shaders.blurH.texture = createTexture(width, height, gl.NEAREST, gl.CLAMP_TO_EDGE, gl.RGBA, gl.UNSIGNED_BYTE);
-    shaders.blurV.texture = createTexture(width, height, gl.NEAREST, gl.CLAMP_TO_EDGE, gl.RGBA, gl.UNSIGNED_BYTE);
-    shaders.blurH.framebuffer = createFramebuffer(shaders.blurH.texture);
-    shaders.blurV.framebuffer = createFramebuffer(shaders.blurV.texture);
+    shaders.blur.texture1 = createTexture(width, height, gl.NEAREST, gl.CLAMP_TO_EDGE, gl.RGBA, gl.UNSIGNED_BYTE);
+    shaders.blur.texture2 = createTexture(width, height, gl.NEAREST, gl.CLAMP_TO_EDGE, gl.RGBA, gl.UNSIGNED_BYTE);
+    shaders.blur.framebuffer1 = createFramebuffer(shaders.blur.texture1);
+    shaders.blur.framebuffer2 = createFramebuffer(shaders.blur.texture2);
 
     gl.bindTexture(gl.TEXTURE_2D, null);
     gl.bindRenderbuffer(gl.RENDERBUFFER, null);
@@ -355,21 +348,20 @@ function generateSSAONoiseTexture() {
 }
 
 function blur(texture) {
-    //gl.viewport(0, 0, gl.viewportWidth/2, gl.viewportHeight/2);
+    var pixelSize = [1/gl.viewportWidth, 1/gl.viewportHeight];
 
-    var p = shaders.blurH.program;
-    gl.bindFramebuffer(gl.FRAMEBUFFER, shaders.blurH.framebuffer);
+    var p = shaders.blur.program;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, shaders.blur.framebuffer1);
     gl.useProgram(p);
-    setBlurUniforms(p, texture, gl.viewportWidth, gl.viewportHeight);
+    setBlurUniforms(p, texture, [pixelSize[0] * 1, pixelSize[1] * 0]);
     drawFullscreenQuad(p);
 
-    p = shaders.blurV.program;
-    gl.bindFramebuffer(gl.FRAMEBUFFER, shaders.blurV.framebuffer);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, shaders.blur.framebuffer2);
     gl.useProgram(p);
-    setBlurUniforms(p, shaders.blurH.texture, gl.viewportWidth, gl.viewportWidth);
+    setBlurUniforms(p, shaders.blur.texture1, [pixelSize[0] * 0, pixelSize[1] * 1]);
     drawFullscreenQuad(p);
 
-    return shaders.blurV.texture;
+    return shaders.blur.texture2;
 }
 
 function drawSSAO() {
