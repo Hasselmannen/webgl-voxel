@@ -81,7 +81,8 @@ function initShaders() {
     shaders.deferred.program = initShader(
         shaders.deferred,
         ["position"],
-        ["normalDepthTexture", "diffuseTexture", "viewSpaceLightPos", "invProjectionMatrix", "shadowMap", "invModelViewMatrix", "ssaoTexture", "godRayIntensity"]
+        ["normalDepthTexture", "diffuseTexture", "viewSpaceLightPos", "invProjectionMatrix",
+         "shadowMap", "invModelViewMatrix", "ssaoTexture", "godRayIntensity"]
     );
     shaders.ssao.program = initShader(
         shaders.ssao,
