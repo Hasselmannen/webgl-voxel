@@ -114,12 +114,12 @@ void main(void) {
         if (i >= nrLights) { break; }
         vec3 diff = vec3(0);
         vec3 spec = vec3(0);
-
-        vec3 directionToLight = -normalize(viewSpacePosition - lights[i]);
+        vec3 vectorFromLight = viewSpacePosition - lights[i];
+        vec3 directionToLight = normalize(-vectorFromLight);
         float diffuseReflectance = max(0.0, dot(directionToLight, normal));
 
         if (diffuseReflectance > 0.0) {
-            accDiffuse += contribution * calculateDiffuse(lightColours[i], color, diffuseReflectance);
+            accDiffuse += contribution * calculateDiffuse(lightColours[i], color, diffuseReflectance) / (dot(vectorFromLight, vectorFromLight)/100.0);
             accSpec    += contribution * calculateSpecular(lightColours[i], fresnel, materialShininess, normal, directionToLight, directionFromEye);
         }
     }
