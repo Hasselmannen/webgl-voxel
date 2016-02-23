@@ -486,7 +486,9 @@ function webGLStart() {
 
     // Start the game loop
     var last = performance.now();
-    (function gameLoop(now){
+
+//    performanceTestLoop(function(now) {
+    gameLoop(function(now) {
         var delta = now - last;
 
         stats1.addSample(delta);
@@ -502,9 +504,23 @@ function webGLStart() {
         lightPos[0] = 8 + Math.sin(time / 1000.0);
 
         last = now;
+    });
+}
 
-        requestAnimationFrame(gameLoop);
+// The normal game loop
+function gameLoop(work) {
+    (function loop(now) {
+        work(now);
+        requestAnimationFrame(loop);
     })(performance.now());
+}
+
+// A game loop used to check performance without syncing to the browser's refresh rate.
+function performanceTestLoop(work) {
+    (function loop() {
+        work(performance.now());
+        setTimeout(loop, 0);
+    })();
 }
 
 function init() {
