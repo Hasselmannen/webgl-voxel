@@ -46,44 +46,43 @@ var hemisphereArray;
 // SHADOW MAP STUFF
 var enableShadows = true;
 
+
 // LIGHTS
-var lights = [
-    [1, 8, 8],
-    [3, 8, 8],
-    [5, 8, 8],
-    [7, 8, 8],
+var maxLights = 8;
+var nrLights = 0;
 
-    [9, 8, 8],
-    [11, 8, 8],
-    [13, 8, 8],
-    [15, 8, 8]
-];
+var colours = {
+    'white' : [1, 1, 1],
+    'black' : [0, 0, 0],
 
+    'red'     : [1, 0, 0],
+    'green'   : [0, 1, 0],
+    'blue'    : [0, 0, 1],
+    'yellow'  : [1, 1, 0],
+    'magenta' : [1, 0, 1],
+    'cyan'    : [0, 1, 1],
+
+    'orange'         : [      1, 127/255,       0],
+    'indigo'         : [ 75/255,       0, 130/255],
+    'violet'         : [127/255,       0,       1],
+    'purple'         : [128/255,       0, 128/255],
+    'pink'           : [      1, 192/255, 203/255],
+    'cornflowerblue' : [100/255, 149/255, 237/255]
+};
+
+var lights          = (new Array(maxLights)).fill(0).map(function(v, i) { return [1+2*i, 8, 8]; });
+var viewSpaceLights = (new Array(maxLights)).fill(0).map(function()     { return new Array(3);  });
 var lightColours = [
-    [1, 0, 0],
-    [0, 1, 0],
-    [0, 0, 1],
-    [1, 1, 0],
+    colours.red,
+    colours.orange,
+    colours.yellow,
+    colours.green,
 
-    [0, 1, 1],
-    [1, 0, 1],
-    [1, 1, 1],
-    [0, 1, 0.5]
+    colours.green,
+    colours.blue,
+    colours.indigo,
+    colours.violet
 ];
-
-var viewSpaceLights = [
-    new Array(3),
-    new Array(3),
-    new Array(3),
-    new Array(3),
-
-    new Array(3),
-    new Array(3),
-    new Array(3),
-    new Array(3)
-]
-
-var nrLights = 8;
 
 function initShader(shader, attributes, uniforms) {
     var program = linkProgram(shader.vs, shader.fs);
