@@ -43,13 +43,9 @@ var rotateSpeed = 0.05;
 var numSSAOSamples = 64;
 var hemisphereArray;
 
-// SHADOW MAP STUFF
+// GLOBAL TOGGLES
 var enableShadows = true;
-
-
-// LIGHTS
-var maxLights = 8;
-var nrLights = 0;
+var enableMainLight = true;
 
 var colours = {
     'white' : [1, 1, 1],
@@ -70,11 +66,9 @@ var colours = {
     'cornflowerblue' : [100/255, 149/255, 237/255]
 };
 
-var spotlightPos        = [8, 8, 10];
-var spotlightDir        = [0, -1, 1];
-var spotlightColour     = colours.cornflowerblue;
-var spotlightInnerAngle = Math.cos(20 * Math.PI / 180);
-var spotlightOuterAngle = Math.cos(30 * Math.PI / 180);
+// LIGHTS
+var maxLights = 8;
+var nrLights = 0;
 
 var lights             = (new Array(maxLights)).fill(0).map(function(v, i) { return [1+2*i, 9, 7]; });
 var lightDirs          = (new Array(maxLights)).fill(0).map(function()     { return [0, -1, 1];    });
@@ -458,7 +452,7 @@ function drawDeferred() {
 
 function render() {
     drawPre();
-    if (enableShadows) {
+    if (enableShadows && enableMainLight) {
         drawShadowMap();
     }
     drawSSAO();
