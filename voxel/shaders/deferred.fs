@@ -13,6 +13,12 @@ uniform sampler2D diffuseTexture;
 uniform samplerCube shadowMap;
 uniform sampler2D ssaoTexture;
 
+#define MAX_NR_LIGHTS 10
+
+uniform vec3 lights[MAX_NR_LIGHTS];
+uniform vec3 lightColours[MAX_NR_LIGHTS];
+uniform int nrLights;
+
 vec3 ambientLight = vec3(0.3, 0.3, 0.3);
 vec3 diffuseLight = vec3(0.9, 0.9, 0.5);
 vec3 specularLight = vec3(0.9, 0.9, 0.5);
@@ -101,10 +107,27 @@ void main(void) {
     crepuscularRays *= length(stepSize) * godRayIntensity;
     #endif
 
+    vec3 accDiffuse = vec3(0);
+    vec3 accSpec    = vec3(0);
+    float contribution = 0.15;
+    for (int i = 0; i < MAX_NR_LIGHTS; i++) {
+        if (i >= nrLights) { break; }
+        vec3 diff = vec3(0);
+        vec3 spec = vec3(0);
+
+        vec3 directionToLight = -normalize(viewSpacePosition - lights[i]);
+        float diffuseReflectance = max(0.0, dot(directionToLight, normal));
+
+        if (diffuseReflectance > 0.0) {
+            accDiffuse += contribution * calculateDiffuse(lightColours[i], color, diffuseReflectance);
+            accSpec    += contribution * calculateSpecular(lightColours[i], fresnel, materialShininess, normal, directionToLight, directionFromEye);
+        }
+    }
+
     gl_FragColor = vec4(vec3(0)
     + ambient * vec3(occlusion)
-    + diffuse * visibility
-    + specular * visibility
+    + diffuse * visibility + accDiffuse
+    + specular * visibility + accSpec
     + crepuscularRays
     , 1.0);
 }

@@ -14,6 +14,7 @@ var inputEnableNormalMap  = document.getElementById("enable-normal-mapping" );
 var inputEnableDiffuse    = document.getElementById("enable-diffuse-texture");
 var inputGodRayIntensity  = document.getElementById("god-ray-intensity"     );
 var inputEnableShadows    = document.getElementById("enable-shadows"        );
+var inputNumberLights     = document.getElementById("number-extra-lights"   );
 
 inputNumGodRaySamples.onchange = function() {
     shaders.deferred.fs = setDefined(shaders.deferred.fs, true,
@@ -68,4 +69,8 @@ inputEnableShadows.onchange = function() {
     shaders.deferred.fs = setDefined(shaders.deferred.fs, inputEnableShadows.checked, "SHADOWS");
     shaders.deferred.program = reloadShader(shaders.deferred);
     enableShadows = inputEnableShadows.checked;
+}
+
+inputNumberLights.onchange = function() {
+    nrLights = Math.min(8, Math.max(0, inputNumberLights.value));
 }
