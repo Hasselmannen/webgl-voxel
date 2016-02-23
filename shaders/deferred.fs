@@ -15,9 +15,12 @@ uniform sampler2D ssaoTexture;
 
 #define MAX_NR_LIGHTS 10
 
-uniform vec3 lights[MAX_NR_LIGHTS];
+uniform vec3 viewSpaceLightPositions[MAX_NR_LIGHTS];
 uniform vec3 lightColours[MAX_NR_LIGHTS];
 uniform int nrLights;
+uniform vec3 viewSpaceLightDirs[MAX_NR_LIGHTS];
+uniform float lightInnerAngles[MAX_NR_LIGHTS];
+uniform float lightOuterAngles[MAX_NR_LIGHTS];
 
 vec3 ambientLight = vec3(0.3, 0.3, 0.3);
 vec3 diffuseLight = vec3(0.9, 0.9, 0.5);
@@ -109,25 +112,31 @@ void main(void) {
 
     vec3 accDiffuse = vec3(0);
     vec3 accSpec    = vec3(0);
-    float contribution = 0.15;
     for (int i = 0; i < MAX_NR_LIGHTS; i++) {
         if (i >= nrLights) { break; }
-        vec3 diff = vec3(0);
-        vec3 spec = vec3(0);
-        vec3 vectorFromLight = viewSpacePosition - lights[i];
-        vec3 directionToLight = normalize(-vectorFromLight);
+
+        vec3 diffuse = vec3(0);
+        vec3 specular = vec3(0);
+
+        vec3 directionToLight = normalize(viewSpaceLightPositions[i] - viewSpacePosition);
+
         float diffuseReflectance = max(0.0, dot(directionToLight, normal));
 
         if (diffuseReflectance > 0.0) {
-            accDiffuse += contribution * calculateDiffuse(lightColours[i], color, diffuseReflectance) / (dot(vectorFromLight, vectorFromLight)/100.0);
-            accSpec    += contribution * calculateSpecular(lightColours[i], fresnel, materialShininess, normal, directionToLight, directionFromEye);
+            float angle = dot(directionToLight, -viewSpaceLightDirs[i]);
+            float attenuation = smoothstep(lightOuterAngles[i], lightInnerAngles[i], angle);
+
+            accDiffuse += attenuation * calculateDiffuse(lightColours[i], color, diffuseReflectance);
+            accSpec    += attenuation * calculateSpecular(lightColours[i], fresnel, materialShininess, normal, directionToLight, directionFromEye);
         }
     }
 
     gl_FragColor = vec4(vec3(0)
     + ambient * vec3(occlusion)
-    + diffuse * visibility + accDiffuse
-    + specular * visibility + accSpec
+    + diffuse * visibility
+    + specular * visibility
     + crepuscularRays
+    + accDiffuse
+    + accSpec
     , 1.0);
 }
