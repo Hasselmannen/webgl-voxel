@@ -290,34 +290,14 @@ function drawPre() {
     }
 }
 
-function addVec(a, b, c) {
-    if (!c) {
-        var c = new Array(a.length);
-    }
-    for (i = 0; i < a.length; i++) {
-        c[i] = a[i] + b[i];
-    }
-    return c;
-}
-
-function mulVec(a, b, c) {
-    if (!c) {
-        var c = new Array(a.length);
-    }
-    for (i = 0; i < a.length; i++) {
-        c[i] = a[i] * b[i];
-    }
-    return c;
-}
-
 function drawShadowMap() {
     mat4.perspective(90, 1, 0.1, shadowMapFarPlane, shadowMapProjectionMatrix);
-    shadowMapModelViewMatrices[0] = mat4.lookAt(lightPos, addVec(lightPos, [ 1, 0, 0]), [0, -1,  0]);
-    shadowMapModelViewMatrices[1] = mat4.lookAt(lightPos, addVec(lightPos, [-1, 0, 0]), [0, -1,  0]);
-    shadowMapModelViewMatrices[2] = mat4.lookAt(lightPos, addVec(lightPos, [ 0, 1, 0]), [0,  0,  1]);
-    shadowMapModelViewMatrices[3] = mat4.lookAt(lightPos, addVec(lightPos, [ 0,-1, 0]), [0,  0, -1]);
-    shadowMapModelViewMatrices[4] = mat4.lookAt(lightPos, addVec(lightPos, [ 0, 0, 1]), [0, -1,  0]);
-    shadowMapModelViewMatrices[5] = mat4.lookAt(lightPos, addVec(lightPos, [ 0, 0,-1]), [0, -1,  0]);
+    shadowMapModelViewMatrices[0] = mat4.lookAt(lightPos, vec3.add([ 1, 0, 0], lightPos), [0, -1,  0]);
+    shadowMapModelViewMatrices[1] = mat4.lookAt(lightPos, vec3.add([-1, 0, 0], lightPos), [0, -1,  0]);
+    shadowMapModelViewMatrices[2] = mat4.lookAt(lightPos, vec3.add([ 0, 1, 0], lightPos), [0,  0,  1]);
+    shadowMapModelViewMatrices[3] = mat4.lookAt(lightPos, vec3.add([ 0,-1, 0], lightPos), [0,  0, -1]);
+    shadowMapModelViewMatrices[4] = mat4.lookAt(lightPos, vec3.add([ 0, 0, 1], lightPos), [0, -1,  0]);
+    shadowMapModelViewMatrices[5] = mat4.lookAt(lightPos, vec3.add([ 0, 0,-1], lightPos), [0, -1,  0]);
 
     gl.clearColor(shadowMapFarPlane, shadowMapFarPlane, shadowMapFarPlane, shadowMapFarPlane);
     gl.viewport(0, 0, shadowMapSize, shadowMapSize);
@@ -377,12 +357,12 @@ function blur(texture) {
     var p = shaders.blur.program;
     gl.bindFramebuffer(gl.FRAMEBUFFER, shaders.blur.framebuffer1);
     gl.useProgram(p);
-    setBlurUniforms(p, texture, mulVec(pixelSize, [1, 0]));
+    setBlurUniforms(p, texture, [pixelSize[0], 0]);
     drawFullscreenQuad(p);
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, shaders.blur.framebuffer2);
     gl.useProgram(p);
-    setBlurUniforms(p, shaders.blur.texture1, mulVec(pixelSize, [0, 1]));
+    setBlurUniforms(p, shaders.blur.texture1, [0, pixelSize[1]]);
     drawFullscreenQuad(p);
 
     return shaders.blur.texture2;
