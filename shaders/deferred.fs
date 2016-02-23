@@ -35,6 +35,7 @@ const float EPS2 = 0.25;
 #define CREPUSCULAR_RAYS
 #define NUM_CREPUSCULAR_SAMPLES 100
 #define SHADOWS
+#define MAIN_LIGHT
 
 vec3 calculateAmbient(vec3 ambientLight, vec3 materialAmbient) {
     return ambientLight * materialAmbient;
@@ -74,9 +75,18 @@ void main(void) {
     vec3 color = colorRGBA.rgb;
     vec3 viewSpacePosition = vec3((farPlaneRay * depth).xy, -depth);
 
+    vec3 ambient = calculateAmbient(ambientLight, color);
+
+    vec3 directionFromEye = normalize(viewSpacePosition);
+    vec3 fresnel = calculateFresnel(color, normal, directionFromEye);
+
+    vec3 diffuse = vec3(0);
+    vec3 specular = vec3(0);
+    vec3 crepuscularRays = vec3(0);
+
+    #ifdef MAIN_LIGHT
     vec3 vectorFromLight = viewSpacePosition - viewSpaceLightPos;
     vec3 directionToLight = normalize(-vectorFromLight);
-    vec3 directionFromEye = normalize(viewSpacePosition);
 
     float diffuseReflectance = max(0.0, dot(directionToLight, normal));
     float visibility = 0.0;
@@ -84,19 +94,11 @@ void main(void) {
         visibility = 1.0;
     }
 
-    vec3 fresnel = calculateFresnel(color, normal, directionFromEye);
-
-    vec3 ambient = calculateAmbient(ambientLight, color);
-
-    vec3 diffuse = vec3(0);
-    vec3 specular = vec3(0);
     if (visibility > 0.01) {
         diffuse = calculateDiffuse(diffuseLight, color, diffuseReflectance);
         specular = calculateSpecular(specularLight, fresnel, materialShininess, normal, directionToLight, directionFromEye);
     }
-    //vec3 emissive = materialEmissive;
 
-    vec3 crepuscularRays = vec3(0);
     #if defined(CREPUSCULAR_RAYS) && defined(SHADOWS)
     vec3 stepSize = viewSpacePosition / float(NUM_CREPUSCULAR_SAMPLES);
     vec3 intensity = crepuscularLight / float(NUM_CREPUSCULAR_SAMPLES);
@@ -109,6 +111,8 @@ void main(void) {
     }
     crepuscularRays *= length(stepSize) * godRayIntensity;
     #endif
+    #endif
+    //vec3 emissive = materialEmissive;
 
     vec3 accDiffuse = vec3(0);
     vec3 accSpec    = vec3(0);
@@ -133,8 +137,8 @@ void main(void) {
 
     gl_FragColor = vec4(vec3(0)
     + ambient * vec3(occlusion)
-    + diffuse * visibility
-    + specular * visibility
+    + diffuse
+    + specular
     + crepuscularRays
     + accDiffuse
     + accSpec
