@@ -43,6 +43,9 @@ var rotateSpeed = 0.05;
 var numSSAOSamples = 64;
 var hemisphereArray;
 
+// SHADOW MAP STUFF
+var enableShadows = true;
+
 function initShader(shader, attributes, uniforms) {
     var program = linkProgram(shader.vs, shader.fs);
     gl.useProgram(program);
@@ -405,7 +408,9 @@ function drawDeferred() {
 
 function render() {
     drawPre();
-    drawShadowMap();
+    if (enableShadows) {
+        drawShadowMap();
+    }
     drawSSAO();
     drawDeferred();
 }

@@ -25,6 +25,7 @@ const float EPS2 = 0.25;
 
 #define CREPUSCULAR_RAYS
 #define NUM_CREPUSCULAR_SAMPLES 100
+#define SHADOWS
 
 vec3 calculateAmbient(vec3 ambientLight, vec3 materialAmbient) {
     return ambientLight * materialAmbient;
@@ -45,9 +46,12 @@ vec3 calculateSpecular(vec3 specularLight, vec3 materialSpecular, float material
 }
 
 bool inShadow(samplerCube shadowMap, mat4 invModelViewMatrix, vec3 vectorFromLight, float eps1, float eps2) {
-    float nearestDepth = textureCube(shadowMap, mat3(invModelViewMatrix) * vectorFromLight).r;
-    float distanceSquare = dot(vectorFromLight, vectorFromLight);
-    return distanceSquare > eps1 + eps2 * distanceSquare / 10.0 + nearestDepth;
+    #ifdef SHADOWS
+        float nearestDepth = textureCube(shadowMap, mat3(invModelViewMatrix) * vectorFromLight).r;
+        float distanceSquare = dot(vectorFromLight, vectorFromLight);
+        return distanceSquare > eps1 + eps2 * distanceSquare / 10.0 + nearestDepth;
+    #endif
+    return false;
 }
 
 void main(void) {
@@ -84,7 +88,7 @@ void main(void) {
     //vec3 emissive = materialEmissive;
 
     vec3 crepuscularRays = vec3(0);
-    #ifdef CREPUSCULAR_RAYS
+    #if defined(CREPUSCULAR_RAYS) && defined(SHADOWS)
     vec3 stepSize = viewSpacePosition / float(NUM_CREPUSCULAR_SAMPLES);
     vec3 intensity = crepuscularLight / float(NUM_CREPUSCULAR_SAMPLES);
     for (int i = 0; i < NUM_CREPUSCULAR_SAMPLES; i++) {
