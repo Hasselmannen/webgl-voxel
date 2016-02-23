@@ -70,8 +70,19 @@ var colours = {
     'cornflowerblue' : [100/255, 149/255, 237/255]
 };
 
-var lights          = (new Array(maxLights)).fill(0).map(function(v, i) { return [1+2*i, 8, 8]; });
-var viewSpaceLights = (new Array(maxLights)).fill(0).map(function()     { return new Array(3);  });
+var spotlightPos        = [8, 8, 10];
+var spotlightDir        = [0, -1, 1];
+var spotlightColour     = colours.cornflowerblue;
+var spotlightInnerAngle = Math.cos(20 * Math.PI / 180);
+var spotlightOuterAngle = Math.cos(30 * Math.PI / 180);
+
+var lights             = (new Array(maxLights)).fill(0).map(function(v, i) { return [1+2*i, 9, 7]; });
+var lightDirs          = (new Array(maxLights)).fill(0).map(function()     { return [0, -1, 1];    });
+var viewSpaceLights    = (new Array(maxLights)).fill(0).map(function()     { return new Array(3);  });
+var viewSpaceLightDirs = (new Array(maxLights)).fill(0).map(function()     { return new Array(3);  });
+var lightInnerAngles   = (new Array(maxLights)).fill(Math.cos(20 * Math.PI / 180));
+var lightOuterAngles   = (new Array(maxLights)).fill(Math.cos(30 * Math.PI / 180));
+
 var lightColours = [
     colours.red,
     colours.orange,
@@ -123,7 +134,9 @@ function initShaders() {
         shaders.deferred,
         ["position"],
         ["normalDepthTexture", "diffuseTexture", "viewSpaceLightPos", "invProjectionMatrix",
-         "shadowMap", "invModelViewMatrix", "ssaoTexture", "godRayIntensity", "lights", "lightColours", "nrLights"]
+         "shadowMap", "invModelViewMatrix", "ssaoTexture", "godRayIntensity", "viewSpaceLightPositions",
+         "lightColours", "nrLights", "viewSpaceLightDirs", "lightInnerAngles", "lightOuterAngles"]
+
     );
     shaders.ssao.program = initShader(
         shaders.ssao,
@@ -184,9 +197,13 @@ function setDeferredUniforms() {
 
     gl.uniform1f(p.uniforms["godRayIntensity"], godRayIntensity);
 
-    gl.uniform3fv(p.uniforms["lights"],    viewSpaceLights.reduce(function(x, y) { return x.concat(y); }));
-    gl.uniform3fv(p.uniforms["lightColours"], lightColours.reduce(function(x, y) { return x.concat(y); }));
     gl.uniform1i(p.uniforms["nrLights"], nrLights);
+    gl.uniform3fv(p.uniforms["lightColours"],               lightColours.reduce(function(x, y) { return x.concat(y); }));
+    gl.uniform3fv(p.uniforms["viewSpaceLightPositions"], viewSpaceLights.reduce(function(x, y) { return x.concat(y); }));
+    gl.uniform3fv(p.uniforms["viewSpaceLightDirs"],   viewSpaceLightDirs.reduce(function(x, y) { return x.concat(y); }));
+    gl.uniform1fv(p.uniforms["lightOuterAngles"], lightOuterAngles);
+    gl.uniform1fv(p.uniforms["lightInnerAngles"], lightInnerAngles);
+
 }
 function setShadowMapUniforms(face) {
     var p = shaders.shadowmap.program;
@@ -312,12 +329,6 @@ function drawPre() {
 
     modelViewMatrix = camera.viewMatrix();
 
-    mat4.multiplyVec3(modelViewMatrix, lightPos, viewSpaceLightPos);
-
-    for (var i = 0; i < nrLights; i++) {
-        mat4.multiplyVec3(modelViewMatrix, lights[i], viewSpaceLights[i]);
-    }
-
     gl.bindFramebuffer(gl.FRAMEBUFFER, shaders.pre.framebuffer);
     gl.enable(gl.DEPTH_TEST);
     gl.clearColor(0, 0, 0, 100.0);
@@ -424,7 +435,20 @@ function drawSSAO() {
     shaders.ssao.textureBlurred = blur(shaders.ssao.texture);
 }
 
+function addVec(a, b) {
+    return [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+}
+
 function drawDeferred() {
+    modelViewMatrix = camera.viewMatrix();
+
+    mat4.multiplyVec3(modelViewMatrix, lightPos, viewSpaceLightPos);
+
+    for (var i = 0; i < nrLights; i++) {
+        mat4.multiplyVec3(modelViewMatrix, lights[i], viewSpaceLights[i]);
+        viewSpaceLightDirs[i] = mat4.multiplyVec4(modelViewMatrix, vec3.normalize(lightDirs[i].concat(0))).slice(0, 3);
+    }
+
     gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.useProgram(shaders.deferred.program);
