@@ -33,7 +33,7 @@
     <p>
         <label class="input-enable" for="enable-ssao">SSAO:</label>
         <input type="checkbox" id="enable-ssao" checked />
-        <label for="number-ssao-samples">Samples:</label>
+        <label for="number-ssao-samples">Samples (0-100):</label>
         <input type="number" id="number-ssao-samples" min="0" max="100" value="64" />
     </p>
     <p>
@@ -52,6 +52,11 @@
         <label class="input-enable" for="enable-shadows">Shadows: </label>
         <input type="checkbox" id="enable-shadows" checked />
     </p>
+    <p>
+        <label for="number-extra-lights">Number of extra lights (0-8): </label>
+        <input type="number" id="number-extra-lights" min="0" max="8" value="0" />
+    </p>
+
 
     <!-- Script handling all the logic for the input fields -->
     <script type="text/javascript" src="input-handlers.js"></script>

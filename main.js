@@ -46,6 +46,45 @@ var hemisphereArray;
 // SHADOW MAP STUFF
 var enableShadows = true;
 
+// LIGHTS
+var lights = [
+    [1, 8, 8],
+    [3, 8, 8],
+    [5, 8, 8],
+    [7, 8, 8],
+
+    [9, 8, 8],
+    [11, 8, 8],
+    [13, 8, 8],
+    [15, 8, 8]
+];
+
+var lightColours = [
+    [1, 0, 0],
+    [0, 1, 0],
+    [0, 0, 1],
+    [1, 1, 0],
+
+    [0, 1, 1],
+    [1, 0, 1],
+    [1, 1, 1],
+    [0, 1, 0.5]
+];
+
+var viewSpaceLights = [
+    new Array(3),
+    new Array(3),
+    new Array(3),
+    new Array(3),
+
+    new Array(3),
+    new Array(3),
+    new Array(3),
+    new Array(3)
+]
+
+var nrLights = 8;
+
 function initShader(shader, attributes, uniforms) {
     var program = linkProgram(shader.vs, shader.fs);
     gl.useProgram(program);
@@ -85,7 +124,7 @@ function initShaders() {
         shaders.deferred,
         ["position"],
         ["normalDepthTexture", "diffuseTexture", "viewSpaceLightPos", "invProjectionMatrix",
-         "shadowMap", "invModelViewMatrix", "ssaoTexture", "godRayIntensity"]
+         "shadowMap", "invModelViewMatrix", "ssaoTexture", "godRayIntensity", "lights", "lightColours", "nrLights"]
     );
     shaders.ssao.program = initShader(
         shaders.ssao,
@@ -145,6 +184,10 @@ function setDeferredUniforms() {
     gl.uniformMatrix4fv(p.uniforms["invModelViewMatrix"], false, invModelViewMatrix);
 
     gl.uniform1f(p.uniforms["godRayIntensity"], godRayIntensity);
+
+    gl.uniform3fv(p.uniforms["lights"],    viewSpaceLights.reduce(function(x, y) { return x.concat(y); }));
+    gl.uniform3fv(p.uniforms["lightColours"], lightColours.reduce(function(x, y) { return x.concat(y); }));
+    gl.uniform1i(p.uniforms["nrLights"], nrLights);
 }
 function setShadowMapUniforms(face) {
     var p = shaders.shadowmap.program;
@@ -271,6 +314,10 @@ function drawPre() {
     modelViewMatrix = camera.viewMatrix();
 
     mat4.multiplyVec3(modelViewMatrix, lightPos, viewSpaceLightPos);
+
+    for (var i = 0; i < nrLights; i++) {
+        mat4.multiplyVec3(modelViewMatrix, lights[i], viewSpaceLights[i]);
+    }
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, shaders.pre.framebuffer);
     gl.enable(gl.DEPTH_TEST);
