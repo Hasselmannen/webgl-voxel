@@ -35,7 +35,7 @@ float materialShininess = 8.0;
 const float EPS1 = 0.0;
 const float EPS2 = 0.25;
 
-#define CREPUSCULAR_RAYS
+#undef CREPUSCULAR_RAYS
 #define NUM_CREPUSCULAR_SAMPLES 100
 #define SHADOWS
 #define MAIN_LIGHT
