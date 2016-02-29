@@ -403,6 +403,7 @@ function drawShadowMaps() {
 
     var p = shaders.shadowmap.program;
     gl.enable(gl.DEPTH_TEST);
+    gl.disable(gl.CULL_FACE);
 
     for (var i = 0; i < nrLights; i++) {
         mat4.perspective(60, 1, 0.1, 100, shadowMapProjectionMatrices[i]);
@@ -424,6 +425,7 @@ function drawShadowMaps() {
             chunks[j].Render(p);
         }
     }
+    gl.enable(gl.CULL_FACE);
 }
 
 function generateSSAOhemisphere() {
