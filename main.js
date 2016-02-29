@@ -39,6 +39,9 @@ var targetDelta = 1000/targetFPS;
 var moveSpeed = 0.1;
 var rotateSpeed = 0.05;
 
+var lightRotationSpeed = 1;
+var lightRotation = 0;
+
 // SSAO Stuff
 var numSSAOSamples = 64;
 var hemisphereArray;
@@ -46,6 +49,7 @@ var hemisphereArray;
 // GLOBAL TOGGLES
 var enableShadows = true;
 var enableMainLight = true;
+var enableLightRotation = true;
 
 var colours = {
     'white' : [1, 1, 1],
@@ -70,7 +74,7 @@ var colours = {
 var maxLights = 8;
 var nrLights = 0;
 
-var lights             = (new Array(maxLights)).fill(0).map(function(v, i) { return [2*i, 9, 7]; });
+var lights             = (new Array(maxLights)).fill(0).map(function(v, i) { return [2 * i + (i > 3 ? 1 : 0), 9, 7]; });
 var lightDirs          = (new Array(maxLights)).fill(0).map(function()     { return [0, -1, 1];    });
 var viewSpaceLights    = (new Array(maxLights)).fill(0).map(function()     { return new Array(3);  });
 var viewSpaceLightDirs = (new Array(maxLights)).fill(0).map(function()     { return new Array(3);  });
@@ -564,6 +568,14 @@ function webGLStart() {
 
         time += delta;
         lightPos[0] = 8 + Math.sin(time / 1000.0);
+
+        if (enableLightRotation) {
+            for (var i = 0; i < nrLights; i++) {
+                lightDirs[i] = [0, Math.sin(lightRotationSpeed * lightRotation),
+                                   Math.cos(lightRotationSpeed * lightRotation)];
+            }
+            lightRotation = (lightRotation + delta / 1000.0) % (2 * Math.PI);
+        }
 
         last = now;
     });
