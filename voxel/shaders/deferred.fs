@@ -13,7 +13,7 @@ uniform sampler2D diffuseTexture;
 uniform samplerCube shadowMap;
 uniform sampler2D ssaoTexture;
 
-#define MAX_NR_LIGHTS 10
+#define MAX_NR_LIGHTS 8
 
 uniform vec3 viewSpaceLightPositions[MAX_NR_LIGHTS];
 uniform vec3 lightColours[MAX_NR_LIGHTS];
@@ -21,6 +21,9 @@ uniform int nrLights;
 uniform vec3 viewSpaceLightDirs[MAX_NR_LIGHTS];
 uniform float lightInnerAngles[MAX_NR_LIGHTS];
 uniform float lightOuterAngles[MAX_NR_LIGHTS];
+uniform mat4 lightMatrices[MAX_NR_LIGHTS];
+
+uniform sampler2D shadowmaps[MAX_NR_LIGHTS];
 
 vec3 ambientLight = vec3(0.3, 0.3, 0.3);
 vec3 diffuseLight = vec3(0.9, 0.9, 0.5);
@@ -62,6 +65,16 @@ bool inShadow(samplerCube shadowMap, mat4 invModelViewMatrix, vec3 vectorFromLig
         return distanceSquare > eps1 + eps2 * distanceSquare / 10.0 + nearestDepth;
     #endif
     return false;
+}
+
+bool inShadow2(sampler2D shadowmap, vec3 viewSpacePosition, mat4 lightMatrix, vec3 vectorFromLight, float eps1, float eps2) {
+    vec4 texCoord = lightMatrix * vec4(viewSpacePosition, 1.0);
+    texCoord /= texCoord.q;
+    texCoord *= 0.5;
+    texCoord += 0.5;
+    float nearestDepth = texture2D(shadowmap, texCoord.xy).r;
+    float distanceSquare = dot(vectorFromLight, vectorFromLight);
+    return texCoord.x < 0.0 || texCoord.x > 1.0 || texCoord.y < 0.0 || texCoord.y > 1.0 || (distanceSquare > eps1 + eps2 * distanceSquare / 10.0 + nearestDepth);
 }
 
 void main(void) {
@@ -118,20 +131,16 @@ void main(void) {
     vec3 accSpec    = vec3(0);
     for (int i = 0; i < MAX_NR_LIGHTS; i++) {
         if (i >= nrLights) { break; }
-
-        vec3 diffuse = vec3(0);
-        vec3 specular = vec3(0);
-
-        vec3 directionToLight = normalize(viewSpaceLightPositions[i] - viewSpacePosition);
+        vec3 vectorFromLight = viewSpacePosition - viewSpaceLightPositions[i];
+        vec3 directionToLight = normalize(-vectorFromLight);
 
         float diffuseReflectance = max(0.0, dot(directionToLight, normal));
 
-        if (diffuseReflectance > 0.0) {
-            float angle = dot(directionToLight, -viewSpaceLightDirs[i]);
-            float attenuation = smoothstep(lightOuterAngles[i], lightInnerAngles[i], angle);
-
-            accDiffuse += attenuation * calculateDiffuse(lightColours[i], color, diffuseReflectance);
-            accSpec    += attenuation * calculateSpecular(lightColours[i], fresnel, materialShininess, normal, directionToLight, directionFromEye);
+        if (diffuseReflectance > 0.0 && !inShadow2(shadowmaps[i], viewSpacePosition, lightMatrices[i], vectorFromLight, EPS1, EPS2)) {
+                float angle = dot(directionToLight, -viewSpaceLightDirs[i]);
+                float attenuation = smoothstep(lightOuterAngles[i], lightInnerAngles[i], angle);
+                accDiffuse += attenuation * calculateDiffuse(lightColours[i], color, diffuseReflectance);
+                accSpec    += attenuation * calculateSpecular(lightColours[i], fresnel, materialShininess, normal, directionToLight, directionFromEye);
         }
     }
 
