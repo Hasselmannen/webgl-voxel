@@ -38,11 +38,11 @@ function setSSAO(enable) {
 }
 inputNumSSAOSamples.onchange = function() {
     var value = inputNumSSAOSamples.value;
-    numSSAOSamples = value;
-    if (value == null || value <= 0) {
+    if (!value || value <= 0) {
         shaders.ssao.fs = setSSAO(false);
     }
     else {
+        numSSAOSamples = value;
         shaders.ssao.fs = setSSAO(inputEnableSSAO.checked);
         shaders.ssao.fs = setDefined(shaders.ssao.fs, true, "NUM_SSAO_SAMPLES", value);
     }
