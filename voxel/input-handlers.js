@@ -16,6 +16,8 @@ var inputGodRayIntensity  = document.getElementById("god-ray-intensity"     );
 var inputEnableMainLight  = document.getElementById("enable-main-light"     );
 var inputEnableShadows    = document.getElementById("enable-shadows"        );
 var inputNumberLights     = document.getElementById("number-extra-lights"   );
+var inputRotationSpeed    = document.getElementById("light-rotation-speed"  );
+var inputEnableRotation   = document.getElementById("enable-light-rotation" );
 
 inputNumGodRaySamples.onchange = function() {
     shaders.deferred.fs = setDefined(shaders.deferred.fs, true,
@@ -80,4 +82,11 @@ inputEnableShadows.onchange = function() {
 
 inputNumberLights.onchange = function() {
     nrLights = Math.min(8, Math.max(0, inputNumberLights.value));
+}
+
+inputRotationSpeed.onchange = function() {
+    lightRotationSpeed = Math.max(0, inputRotationSpeed.value);
+}
+inputEnableRotation.onchange = function() {
+    enableLightRotation = inputEnableRotation.checked;
 }
