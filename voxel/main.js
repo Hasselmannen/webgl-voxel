@@ -96,6 +96,7 @@ var lightColours = [
 var shadowMapViewMatrices       = (new Array(maxLights)).fill(0).map(function() { return new Array(16); });
 var shadowMapProjectionMatrices = (new Array(maxLights)).fill(0).map(function() { return new Array(16); });
 var lightMatrices               = (new Array(maxLights)).fill(0).map(function() { return new Array(16); });
+var shadowMapSizes              = (new Array(maxLights)).fill(0).map(function() { return [512, 512];    });
 
 function initShader(shader, attributes, uniforms) {
     var program = linkProgram(shader.vs, shader.fs);
@@ -137,7 +138,7 @@ function initShaders() {
         ["position"],
         ["normalDepthTexture", "diffuseTexture", "viewSpaceLightPos", "invProjectionMatrix",
          "shadowMap", "invModelViewMatrix", "ssaoTexture", "godRayIntensity", "viewSpaceLightPositions",
-         "lightColours", "nrLights", "viewSpaceLightDirs", "lightInnerAngles", "lightOuterAngles", "shadowmaps", "lightMatrices"]
+         "lightColours", "nrLights", "viewSpaceLightDirs", "lightInnerAngles", "lightOuterAngles", "shadowmaps", "lightMatrices", "shadowMapSizes"]
     );
     shaders.ssao.program = initShader(
         shaders.ssao,
@@ -216,6 +217,7 @@ function setDeferredUniforms() {
     gl.uniform3fv(p.uniforms["viewSpaceLightDirs"],   viewSpaceLightDirs.reduce(function(x, y) { return x.concat(y); }));
     gl.uniform1fv(p.uniforms["lightOuterAngles"], lightOuterAngles);
     gl.uniform1fv(p.uniforms["lightInnerAngles"], lightInnerAngles);
+    gl.uniform2fv(p.uniforms["shadowMapSizes"], shadowMapSizes.reduce(function(x, y) { return x.concat(y); }));
     gl.uniformMatrix4fv(p.uniforms["lightMatrices"], false, lightMatrices.reduce(function(x, y) { return x.concat(y); }));
 }
 function setShadowMapUniforms(face) {
@@ -278,8 +280,8 @@ function initFramebuffers(width, height) {
     shaders.shadowmap.textures      = new Array(maxLights);
     shaders.shadowmap.framebuffers2 = new Array(maxLights);
     for (var i = 0; i < maxLights; i++) {
-        shaders.shadowmap.textures[i] = createTexture(512, 512, gl.NEAREST, gl.CLAMP_TO_EDGE, gl.RGBA, gl.FLOAT);
-        shaders.shadowmap.framebuffers2[i] = createFramebufferWithDepth(shaders.shadowmap.textures[i], 512, 512);
+        shaders.shadowmap.textures[i] = createTexture(shadowMapSizes[i][0], shadowMapSizes[i][1], gl.NEAREST, gl.CLAMP_TO_EDGE, gl.RGBA, gl.FLOAT);
+        shaders.shadowmap.framebuffers2[i] = createFramebufferWithDepth(shaders.shadowmap.textures[i], shadowMapSizes[i][0], shadowMapSizes[i][1]);
     }
 
     gl.bindTexture(gl.TEXTURE_2D, null);
@@ -403,13 +405,13 @@ function setShadowMapsUniforms(i) {
 function drawShadowMaps() {
 
     gl.clearColor(10000, 10000, 10000, 1);
-    gl.viewport(0, 0, 512, 512);
 
     var p = shaders.shadowmap.program;
     gl.enable(gl.DEPTH_TEST);
     gl.disable(gl.CULL_FACE);
 
     for (var i = 0; i < nrLights; i++) {
+        gl.viewport(0, 0, shadowMapSizes[i][0], shadowMapSizes[i][1]);
         mat4.perspective(60, 1, 0.1, 100, shadowMapProjectionMatrices[i]);
         mat4.lookAt(lights[i], addVec(lights[i], lightDirs[i]), [0, 1, 0], shadowMapViewMatrices[i]);
 

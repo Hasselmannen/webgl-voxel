@@ -22,6 +22,7 @@ uniform vec3 viewSpaceLightDirs[MAX_NR_LIGHTS];
 uniform float lightInnerAngles[MAX_NR_LIGHTS];
 uniform float lightOuterAngles[MAX_NR_LIGHTS];
 uniform mat4 lightMatrices[MAX_NR_LIGHTS];
+uniform vec2 shadowMapSizes[MAX_NR_LIGHTS];
 
 uniform sampler2D shadowmaps[MAX_NR_LIGHTS];
 
@@ -82,6 +83,17 @@ bool inShadow2(sampler2D shadowmap, vec3 viewSpacePosition, mat4 lightMatrix, ve
     float distanceSquare = dot(vectorFromLight, vectorFromLight);
 
     return distanceSquare > eps1 + eps2 * distanceSquare / 10.0 + nearestDepth;
+}
+
+// Naïve brute-force PCF; shadow samplers do not exist in WebGL
+float PCF(sampler2D shadowmap, vec3 viewSpacePosition, mat4 lightMatrix, vec3 vectorFromLight, float eps1, float eps2, vec2 shadowMapSize) {
+    float visibility = 0.0;
+    for (float y = -2.0; y <= 2.0; y += 1.0) {
+        for (float x = -2.0; x <= 2.0; x += 1.0) {
+            visibility += inShadow2(shadowmap, viewSpacePosition, lightMatrix, vectorFromLight, eps1, eps2 + (abs(x) + abs(y))/2.0, vec2(x, y) / shadowMapSize) ? 0.0 : 1.0;
+        }
+    }
+    return visibility / 25.0;
 }
 
 void main(void) {
@@ -147,14 +159,7 @@ void main(void) {
             float angle = dot(directionToLight, -viewSpaceLightDirs[i]);
             float attenuation = smoothstep(lightOuterAngles[i], lightInnerAngles[i], angle);
 
-            // Naïve brute-force PCF; shadow samplers do not exist in WebGL
-            float visibility = 0.0;
-            for (float y = -2.0; y <= 2.0; y += 1.0) {
-                for (float x = -2.0; x <= 2.0; x += 1.0) {
-                    visibility += inShadow2(shadowmaps[i], viewSpacePosition, lightMatrices[i], vectorFromLight, EPS1, EPS2 + (abs(x) + abs(y))/2.0, vec2(x, y) / 512.0) ? 0.0 : 1.0;
-                }
-            }
-            visibility /= 25.0;
+            float visibility = PCF(shadowmaps[i], viewSpacePosition, lightMatrices[i], vectorFromLight, EPS1, EPS2, shadowMapSizes[i]);
 
             if (visibility > 0.0) {
                 accDiffuse += visibility * attenuation * calculateDiffuse(lightColours[i], color, diffuseReflectance);
