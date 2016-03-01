@@ -147,6 +147,7 @@ void main(void) {
             float angle = dot(directionToLight, -viewSpaceLightDirs[i]);
             float attenuation = smoothstep(lightOuterAngles[i], lightInnerAngles[i], angle);
 
+            // Naïve brute-force PCF; shadow samplers do not exist in WebGL
             float visibility = 0.0;
             for (float y = -2.0; y <= 2.0; y += 1.0) {
                 for (float x = -2.0; x <= 2.0; x += 1.0) {
