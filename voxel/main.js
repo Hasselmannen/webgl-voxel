@@ -74,12 +74,12 @@ var colours = {
 var maxLights = 8;
 var nrLights = 0;
 
-var lights             = (new Array(maxLights)).fill(0).map(function(v, i) { return [2 * i + (i > 3 ? 1 : 0), 9, 7]; });
-var lightDirs          = (new Array(maxLights)).fill(0).map(function()     { return [0, -1, 1];    });
-var viewSpaceLights    = (new Array(maxLights)).fill(0).map(function()     { return new Array(3);  });
-var viewSpaceLightDirs = (new Array(maxLights)).fill(0).map(function()     { return new Array(3);  });
-var lightInnerAngles   = (new Array(maxLights)).fill(Math.cos(20 * Math.PI / 180));
-var lightOuterAngles   = (new Array(maxLights)).fill(Math.cos(30 * Math.PI / 180));
+var lights             = createArray(maxLights, function(v, i) { return [2 * i + (i > 3 ? 1 : 0), 9, 7]; });
+var lightDirs          = createArray(maxLights, function() { return [0, -1, 1]; });
+var viewSpaceLights    = createMultiDimArray(maxLights, 3);
+var viewSpaceLightDirs = createMultiDimArray(maxLights, 3);
+var lightInnerAngles   = createArray(maxLights, function() { return Math.cos(20 * Math.PI / 180); });
+var lightOuterAngles   = createArray(maxLights, function() { return Math.cos(30 * Math.PI / 180); });
 
 var lightColours = [
     colours.red,
@@ -93,10 +93,10 @@ var lightColours = [
     colours.violet
 ];
 
-var shadowMapViewMatrices       = (new Array(maxLights)).fill(0).map(function() { return new Array(16); });
-var shadowMapProjectionMatrices = (new Array(maxLights)).fill(0).map(function() { return new Array(16); });
-var lightMatrices               = (new Array(maxLights)).fill(0).map(function() { return new Array(16); });
-var shadowMapSizes              = (new Array(maxLights)).fill(0).map(function() { return [512, 512];    });
+var shadowMapViewMatrices       = createMultiDimArray(maxLights, 4*4);
+var shadowMapProjectionMatrices = createMultiDimArray(maxLights, 4*4);
+var lightMatrices               = createMultiDimArray(maxLights, 4*4);
+var shadowMapSizes              = createArray(maxLights, function() { return [512, 512]; });
 
 function initShader(shader, attributes, uniforms) {
     var program = linkProgram(shader.vs, shader.fs);
@@ -212,13 +212,13 @@ function setDeferredUniforms() {
     gl.uniform1f(p.uniforms["godRayIntensity"], godRayIntensity);
 
     gl.uniform1i(p.uniforms["nrLights"], nrLights);
-    gl.uniform3fv(p.uniforms["lightColours"],               lightColours.reduce(function(x, y) { return x.concat(y); }));
-    gl.uniform3fv(p.uniforms["viewSpaceLightPositions"], viewSpaceLights.reduce(function(x, y) { return x.concat(y); }));
-    gl.uniform3fv(p.uniforms["viewSpaceLightDirs"],   viewSpaceLightDirs.reduce(function(x, y) { return x.concat(y); }));
+    gl.uniform3fv(p.uniforms["lightColours"],            concatArrays(lightColours));
+    gl.uniform3fv(p.uniforms["viewSpaceLightPositions"], concatArrays(viewSpaceLights));
+    gl.uniform3fv(p.uniforms["viewSpaceLightDirs"],      concatArrays(viewSpaceLightDirs));
     gl.uniform1fv(p.uniforms["lightOuterAngles"], lightOuterAngles);
     gl.uniform1fv(p.uniforms["lightInnerAngles"], lightInnerAngles);
-    gl.uniform2fv(p.uniforms["shadowMapSizes"], shadowMapSizes.reduce(function(x, y) { return x.concat(y); }));
-    gl.uniformMatrix4fv(p.uniforms["lightMatrices"], false, lightMatrices.reduce(function(x, y) { return x.concat(y); }));
+    gl.uniform2fv(p.uniforms["shadowMapSizes"], concatArrays(shadowMapSizes));
+    gl.uniformMatrix4fv(p.uniforms["lightMatrices"], false, concatArrays(lightMatrices));
 }
 function setShadowMapUniforms(face) {
     var p = shaders.shadowmap.program;
@@ -507,7 +507,7 @@ function drawDeferred() {
 
     for (var i = 0; i < nrLights; i++) {
         mat4.multiplyVec3(modelViewMatrix, lights[i], viewSpaceLights[i]);
-        viewSpaceLightDirs[i] = mat4.multiplyVec4(modelViewMatrix, vec3.normalize(lightDirs[i].concat(0))).slice(0, 3);
+        viewSpaceLightDirs[i] = mat4.multiplyVec4(modelViewMatrix, vec3.normalize(lightDirs[i].concat(0))).slice(0, 3); // Normalizing a 4-vector with vec3.normalize is intentional
     }
 
     gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);

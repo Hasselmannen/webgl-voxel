@@ -5,7 +5,7 @@ var fullscreenQuadVertices = [
      1.0,  1.0,
     -1.0,  1.0,
     -1.0, -1.0,
-    
+
     -1.0, -1.0,
      1.0, -1.0,
      1.0,  1.0
@@ -18,7 +18,7 @@ function drawFullscreenQuad(shader) {
     var screenQuadVBO = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, fullscreenQuadVertexBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(fullscreenQuadVertices), gl.STATIC_DRAW);
-    
+
     gl.enableVertexAttribArray(shader.attributes["position"]);
     gl.vertexAttribPointer(shader.attributes["position"], 2, gl.FLOAT, false, 0, 0);
 
@@ -42,7 +42,7 @@ document.onkeyup = function(e) {
     if (index > -1) {
         keysDown.splice(index, 1);
     }
-    
+
     index = keysPressedLast.indexOf(e.keyCode);
     if (index > -1) {
         keysPressedLast.splice(index, 1);
@@ -51,7 +51,7 @@ document.onkeyup = function(e) {
 
 function isKeyPressed(key) {
     var index = keysPressed.indexOf(key);
-    
+
     if (index > -1) {
         keysPressed.splice(index, 1);
         keysPressedLast.push(key);
@@ -84,10 +84,10 @@ frameTimeStats.prototype.addSample = function(sampleInMillis) {
     var avg = this._samples.reduce(function(a, b) { return a + b; }) / this._currentSamples;
     var min = this._samples.reduce(function(a, b) { return Math.min(a, b); });
     var max = this._samples.reduce(function(a, b) { return Math.max(a, b); });
-    
+
     var varianceSum = this._samples.reduce(function(a, b) { return a + Math.pow(b - avg, 2); });
     var standardDeviation = Math.sqrt(varianceSum / this._currentSamples);
-    
+
     this._output.innerHTML = "Last " + this._currentSamples + " frames (ms): " +
         "Avg: " + avg.toFixed(1) +
         ", SD: " + standardDeviation.toFixed(1) +
@@ -107,4 +107,16 @@ rendererInfo.prototype.display = function() {
     else {
         this._output.innerHTML = "ERROR: Cannot display renderer info (WEBGL_debug_renderer_info not supported)."
     }
+}
+
+function createArray(length, f) {
+    return (new Array(length)).fill(null).map(f ? f : function() { return null; });
+}
+
+function createMultiDimArray(cols, rows, f) {
+    return createArray(cols, function() { return createArray(rows, f); });
+}
+
+function concatArrays(arrays) {
+    return arrays.reduce(function(x, y) { return x.concat(y); });
 }
