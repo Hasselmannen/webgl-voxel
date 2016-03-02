@@ -1,6 +1,3 @@
-// This file currently requires a WebGL context
-// initiated as with variable name "gl"
-
 var fullscreenQuadVertices = [
      1.0,  1.0,
     -1.0,  1.0,
@@ -11,7 +8,7 @@ var fullscreenQuadVertices = [
      1.0,  1.0
 ];
 
-function drawFullscreenQuad(shader) {
+function drawFullscreenQuad(gl, shader) {
 
     var fullscreenQuadVertexBuffer = gl.createBuffer();
 
@@ -96,13 +93,14 @@ frameTimeStats.prototype.addSample = function(sampleInMillis) {
 }
 
 // Renderer information
-function rendererInfo(outputElement) {
+function rendererInfo(gl, outputElement) {
+    this._gl = gl;
     this._output = outputElement;
     this._ext = gl.getExtension("WEBGL_debug_renderer_info");
 }
 rendererInfo.prototype.display = function() {
     if (this._ext != null) {
-        this._output.innerHTML = "Renderer info: " + gl.getParameter(this._ext.UNMASKED_RENDERER_WEBGL);
+        this._output.innerHTML = "Renderer info: " + this._gl.getParameter(this._ext.UNMASKED_RENDERER_WEBGL);
     }
     else {
         this._output.innerHTML = "ERROR: Cannot display renderer info (WEBGL_debug_renderer_info not supported)."

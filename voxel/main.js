@@ -476,12 +476,12 @@ function blur(texture) {
     gl.bindFramebuffer(gl.FRAMEBUFFER, shaders.blur.framebuffer1);
     gl.useProgram(p);
     setBlurUniforms(p, texture, [pixelSize[0], 0]);
-    drawFullscreenQuad(p);
+    drawFullscreenQuad(gl, p);
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, shaders.blur.framebuffer2);
     gl.useProgram(p);
     setBlurUniforms(p, shaders.blur.texture1, [0, pixelSize[1]]);
-    drawFullscreenQuad(p);
+    drawFullscreenQuad(gl, p);
 
     return shaders.blur.texture2;
 }
@@ -491,7 +491,7 @@ function drawSSAO() {
     gl.bindFramebuffer(gl.FRAMEBUFFER, shaders.ssao.framebuffer);
     gl.useProgram(shaders.ssao.program);
     setSSAOUniforms();
-    drawFullscreenQuad(shaders.ssao.program);
+    drawFullscreenQuad(gl, shaders.ssao.program);
 
     shaders.ssao.textureBlurred = blur(shaders.ssao.texture);
 }
@@ -514,7 +514,7 @@ function drawDeferred() {
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.useProgram(shaders.deferred.program);
     setDeferredUniforms();
-    drawFullscreenQuad(shaders.deferred.program);
+    drawFullscreenQuad(gl, shaders.deferred.program);
 }
 
 function render() {
@@ -548,7 +548,7 @@ function webGLStart() {
     var stats2 = new frameTimeStats(50,  document.getElementById("fps-text2"));
     var stats3 = new frameTimeStats(100, document.getElementById("fps-text3"));
 
-    var rendererInformation = new rendererInfo(document.getElementById("renderer-info"));
+    var rendererInformation = new rendererInfo(gl, document.getElementById("renderer-info"));
 
     var time = 0;
 
