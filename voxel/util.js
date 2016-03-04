@@ -103,7 +103,7 @@ rendererInfo.prototype.display = function() {
         this._output.innerHTML = "Renderer info: " + this._gl.getParameter(this._ext.UNMASKED_RENDERER_WEBGL);
     }
     else {
-        this._output.innerHTML = "ERROR: Cannot display renderer info (WEBGL_debug_renderer_info not supported)."
+        this._output.innerHTML = "ERROR: Cannot display renderer info (WEBGL_debug_renderer_info not supported).";
     }
 }
 
