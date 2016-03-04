@@ -76,25 +76,25 @@ function createLoadTexture(src, filtering, wrapping, mipmap, defaultColour) {
     return texture;
 }
 
-function createTexture(width, height, filtering, wrapping, components, format, data) {
+function createTexture(dims, filtering, wrapping, components, format, data) {
     var texture = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, texture);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filtering);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filtering);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrapping);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrapping);
-    gl.texImage2D(gl.TEXTURE_2D, 0, components, width, height, 0, components, format, data);
+    gl.texImage2D(gl.TEXTURE_2D, 0, components, dims[0], dims[1], 0, components, format, data);
     return texture;
 }
 
-function createCubeMapFramebuffers(texture, width, height) {
+function createCubeMapFramebuffers(texture, dims) {
 // Different framebuffers for every face, it is much faster:
 // http://jsperf.com/webgl-cubemap-fbo-change-face-test
     var framebuffers = new Array(6);
     var depthBuffer = gl.createRenderbuffer();
 
     gl.bindRenderbuffer(gl.RENDERBUFFER, depthBuffer);
-    gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, width, height);
+    gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, dims[0], dims[1]);
 
     for (var i = 0; i < 6; i++) {
         framebuffers[i] = gl.createFramebuffer();
@@ -107,7 +107,7 @@ function createCubeMapFramebuffers(texture, width, height) {
     return framebuffers;
 }
 
-function createCubeMapTexture(width, height, filtering, wrapping, components, format) {
+function createCubeMapTexture(dims, filtering, wrapping, components, format) {
     var texture = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_CUBE_MAP, texture);
     gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MAG_FILTER, filtering);
@@ -116,13 +116,13 @@ function createCubeMapTexture(width, height, filtering, wrapping, components, fo
     gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_T, wrapping);
 
     for (var i = 0; i < 6; i++) {
-        gl.texImage2D(gl.TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, components, width, height, 0, components, format, null);
+        gl.texImage2D(gl.TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, components, dims[0], dims[1], 0, components, format, null);
     }
 
     return texture;
 }
 
-function createFramebufferWithDepth(texture, width, height) {
+function createFramebufferWithDepth(texture, dims) {
     var framebuffer = gl.createFramebuffer();
     var depthBuffer = gl.createRenderbuffer();
 
@@ -130,7 +130,7 @@ function createFramebufferWithDepth(texture, width, height) {
     gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
 
     gl.bindRenderbuffer(gl.RENDERBUFFER, depthBuffer);
-    gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, width, height);
+    gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, dims[0], dims[1]);
 
     gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, depthBuffer);
 

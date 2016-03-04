@@ -255,24 +255,24 @@ function initFramebuffers(width, height) {
     depthMap      = createLoadTexture(cubeTextureData.depthMap,  gl.LINEAR, gl.CLAMP_TO_EDGE, true, [0, 0, 255, 255]);
 
     // PRE SHADER
-    shaders.pre.textureDiffuse     = createTexture(width, height, gl.LINEAR,  gl.CLAMP_TO_EDGE, gl.RGBA, gl.FLOAT);
-    shaders.pre.textureNormalDepth = createTexture(width, height, gl.NEAREST, gl.CLAMP_TO_EDGE, gl.RGBA, gl.FLOAT);
-    shaders.pre.textureDepth       = createTexture(width, height, gl.NEAREST, gl.CLAMP_TO_EDGE, gl.DEPTH_COMPONENT, gl.UNSIGNED_SHORT);
+    shaders.pre.textureDiffuse     = createTexture([width, height], gl.LINEAR,  gl.CLAMP_TO_EDGE, gl.RGBA, gl.FLOAT);
+    shaders.pre.textureNormalDepth = createTexture([width, height], gl.NEAREST, gl.CLAMP_TO_EDGE, gl.RGBA, gl.FLOAT);
+    shaders.pre.textureDepth       = createTexture([width, height], gl.NEAREST, gl.CLAMP_TO_EDGE, gl.DEPTH_COMPONENT, gl.UNSIGNED_SHORT);
     shaders.pre.framebuffer = createMrtFramebuffer([shaders.pre.textureDiffuse,
                                                     shaders.pre.textureNormalDepth],
                                                     shaders.pre.textureDepth);
 
     // SHADOW MAP STUFF
-    shaders.shadowmap.texture = createCubeMapTexture(shadowMapSize, shadowMapSize, gl.NEAREST, gl.CLAMP_TO_EDGE, gl.RGBA, gl.FLOAT);
-    shaders.shadowmap.framebuffers = createCubeMapFramebuffers(shaders.shadowmap.texture, shadowMapSize, shadowMapSize);
+    shaders.shadowmap.texture = createCubeMapTexture([shadowMapSize, shadowMapSize], gl.NEAREST, gl.CLAMP_TO_EDGE, gl.RGBA, gl.FLOAT);
+    shaders.shadowmap.framebuffers = createCubeMapFramebuffers(shaders.shadowmap.texture, [shadowMapSize, shadowMapSize]);
 
     // SSAO
-    shaders.ssao.texture = createTexture(width, height, gl.NEAREST, gl.CLAMP_TO_EDGE, gl.RGBA, gl.UNSIGNED_BYTE);
+    shaders.ssao.texture = createTexture([width, height], gl.NEAREST, gl.CLAMP_TO_EDGE, gl.RGBA, gl.UNSIGNED_BYTE);
     shaders.ssao.framebuffer = createFramebuffer(shaders.ssao.texture);
 
     // BLUR
-    shaders.blur.texture1 = createTexture(width, height, gl.NEAREST, gl.CLAMP_TO_EDGE, gl.RGBA, gl.UNSIGNED_BYTE);
-    shaders.blur.texture2 = createTexture(width, height, gl.NEAREST, gl.CLAMP_TO_EDGE, gl.RGBA, gl.UNSIGNED_BYTE);
+    shaders.blur.texture1 = createTexture([width, height], gl.NEAREST, gl.CLAMP_TO_EDGE, gl.RGBA, gl.UNSIGNED_BYTE);
+    shaders.blur.texture2 = createTexture([width, height], gl.NEAREST, gl.CLAMP_TO_EDGE, gl.RGBA, gl.UNSIGNED_BYTE);
     shaders.blur.framebuffer1 = createFramebuffer(shaders.blur.texture1);
     shaders.blur.framebuffer2 = createFramebuffer(shaders.blur.texture2);
 
@@ -280,8 +280,8 @@ function initFramebuffers(width, height) {
     shaders.shadowmap.textures      = new Array(maxLights);
     shaders.shadowmap.framebuffers2 = new Array(maxLights);
     for (var i = 0; i < maxLights; i++) {
-        shaders.shadowmap.textures[i] = createTexture(shadowMapSizes[i][0], shadowMapSizes[i][1], gl.NEAREST, gl.CLAMP_TO_EDGE, gl.RGBA, gl.FLOAT);
-        shaders.shadowmap.framebuffers2[i] = createFramebufferWithDepth(shaders.shadowmap.textures[i], shadowMapSizes[i][0], shadowMapSizes[i][1]);
+        shaders.shadowmap.textures[i] = createTexture(shadowMapSizes[i], gl.NEAREST, gl.CLAMP_TO_EDGE, gl.RGBA, gl.FLOAT);
+        shaders.shadowmap.framebuffers2[i] = createFramebufferWithDepth(shaders.shadowmap.textures[i], shadowMapSizes[i]);
     }
 
     gl.bindTexture(gl.TEXTURE_2D, null);

@@ -99,7 +99,7 @@ function rendererInfo(gl, outputElement) {
     this._ext = gl.getExtension("WEBGL_debug_renderer_info");
 }
 rendererInfo.prototype.display = function() {
-    if (this._ext != null) {
+    if (this._ext) {
         this._output.innerHTML = "Renderer info: " + this._gl.getParameter(this._ext.UNMASKED_RENDERER_WEBGL);
     }
     else {
